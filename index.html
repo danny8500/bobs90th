@@ -18,7 +18,11 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Pinyon+Script&display=swap" rel="stylesheet">
+<!-- Bodoni Moda is variable on the optical-size axis (6–96). Requesting the full
+     range lets the browser thin the hairlines at display sizes and thicken them
+     at label sizes automatically — without it, 12px small caps in a Didone go
+     spidery and unreadable. -->
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Italianno&display=swap" rel="stylesheet">
 <style>
   /* ==========================================================================
    * Bob's 90th — an event site INSPIRED by the invitation, not a copy of it.
@@ -32,25 +36,30 @@
     --gold:#B48F45; --gold-lt:#C9A961; --gold-dim:rgba(180,143,69,.55);
     --cream:#F6F1E3; --paper:#FCF9F0;
     --rule:rgba(27,58,99,.16); --muted:#71809A;
-    --display:'Playfair Display', Georgia, serif;
-    --serif:'Cormorant Garamond', Georgia, serif;
-    --script:'Pinyon Script', cursive;
+    /* One Didone family throughout — display and labels alike — with the script
+       reserved for the tagline. No sans anywhere on the page. */
+    --display:'Bodoni Moda', 'Didot', Georgia, serif;
+    --serif:'Bodoni Moda', 'Didot', Georgia, serif;
+    --script:'Italianno', 'Allura', cursive;
   }
   *{box-sizing:border-box}
   html{scroll-behavior:smooth}
   html,body{margin:0}
   body{
     background:var(--cream);
-    color:var(--navy); font-family:var(--serif); font-size:19px; line-height:1.6;
-    -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+    color:var(--navy); font-family:var(--serif); font-weight:400; font-size:18px; line-height:1.65;
+    font-optical-sizing:auto;
+    /* Antialiased thins Didone hairlines to the point of dropping out on light
+       backgrounds; the default (subpixel) keeps them. */
+    text-rendering:optimizeLegibility;
   }
   ::selection{background:var(--navy); color:var(--cream)}
   .lining{font-variant-numeric:lining-nums; font-feature-settings:"lnum" 1}
 
   /* ---- shared bits ---- */
   .eyebrow{
-    font-family:var(--serif); font-weight:600; font-size:14px;
-    letter-spacing:.34em; text-transform:uppercase; text-indent:.34em; /* re-center tracked text */
+    font-family:var(--serif); font-weight:400; font-size:13.5px;
+    letter-spacing:.3em; text-transform:uppercase; text-indent:.3em; /* re-center tracked text */
   }
   .goldrule{display:flex; align-items:center; justify-content:center; gap:18px}
   .goldrule i{display:block; height:1px; width:56px; background:var(--gold); opacity:.85}
@@ -66,45 +75,38 @@
       var(--cream);
   }
   /* ---- crest ---- */
-  .crest{display:flex; flex-direction:column; align-items:center; margin-bottom:34px}
-  .crest svg{width:96px; height:80px}
-  .est{display:flex; align-items:center; justify-content:center; margin-top:-2px}
-  .est span{font-family:var(--serif); font-size:13.5px; font-weight:600; letter-spacing:.22em; color:var(--navy)}
-  /* EST. and the year flank the pennant's staff; the gap between them is where
-     the stem lands visually. */
-  .est span:first-of-type{margin-right:48px}
-  .est i{display:block; height:1px; width:52px; background:var(--gold); margin:0 15px; opacity:.85}
-  @media(max-width:460px){ .est i{width:30px; margin:0 10px} .est span:first-of-type{margin-right:32px} }
+  .crest{display:block; width:min(380px,74vw); height:auto; margin:0 auto 30px}
+  @media(max-width:560px){ .crest{width:84vw; margin-bottom:22px} }
 
-  .hero .eyebrow{color:var(--navy-soft); margin:0 0 30px}
+  .hero .eyebrow{color:var(--navy-soft); margin:0 0 26px}
   .timesline{
-    margin:14px 0 0; font-family:var(--serif); font-weight:600; font-size:13.5px;
-    letter-spacing:.24em; text-transform:uppercase; text-indent:.24em; color:var(--gold);
+    margin:14px 0 0; font-family:var(--serif); font-weight:400; font-size:13px;
+    letter-spacing:.28em; text-transform:uppercase; text-indent:.28em; color:var(--gold);
   }
   .hero h1{
-    font-family:var(--display); font-weight:500; color:var(--navy);
-    font-size:clamp(64px,14vw,168px); line-height:.98; letter-spacing:-.01em; margin:0;
+    font-family:var(--display); font-weight:400; color:var(--navy);
+    font-size:clamp(62px,13.5vw,164px); line-height:1.02; letter-spacing:.005em; margin:0;
     text-wrap:balance;
   }
   .hero h1 em{font-style:italic; color:var(--gold); letter-spacing:0}
   .hero h1 .th{font-size:.44em; vertical-align:.62em; letter-spacing:.02em; margin-left:.03em}
   .tagline{
-    font-family:var(--script); color:var(--navy); opacity:.92;
-    font-size:clamp(30px,5.4vw,52px); line-height:1.1; margin:22px 0 0;
+    font-family:var(--script); color:var(--navy); opacity:.94;
+    font-size:clamp(44px,8vw,78px); line-height:1; margin:14px 0 0;
     transform:rotate(-2deg);
   }
   .whenline{
-    margin:44px 0 0; font-family:var(--serif); font-weight:600; font-size:15.5px;
-    letter-spacing:.24em; text-transform:uppercase; text-indent:.24em; color:var(--navy);
+    margin:40px 0 0; font-family:var(--serif); font-weight:400; font-size:15px;
+    letter-spacing:.26em; text-transform:uppercase; text-indent:.26em; color:var(--navy);
   }
   .whenline .sep{color:var(--gold); margin:0 10px}
   .whereline{margin:10px 0 0; font-size:17px; font-style:italic; color:var(--muted); letter-spacing:.04em}
 
   .cta{
     display:inline-block; margin-top:48px; text-decoration:none;
-    font-family:var(--serif); font-weight:600; font-size:15px; letter-spacing:.26em;
-    text-transform:uppercase; text-indent:.26em; color:var(--cream);
-    background:var(--navy); padding:20px 46px; border:1px solid var(--navy);
+    font-family:var(--serif); font-weight:400; font-size:14.5px; letter-spacing:.28em;
+    text-transform:uppercase; text-indent:.28em; color:var(--cream);
+    background:var(--navy); padding:21px 48px; border:1px solid var(--navy);
     transition:background .18s, letter-spacing .25s;
   }
   .cta:hover{background:var(--navy-deep); letter-spacing:.3em}
@@ -124,8 +126,8 @@
   .band .eyebrow{color:var(--gold-lt); text-align:center; margin-bottom:64px}
   .cols{display:grid; grid-template-columns:1fr 1fr 1fr; gap:56px; text-align:center}
   @media(max-width:820px){ .cols{grid-template-columns:1fr; gap:52px} }
-  .col .lab{font-size:13px; font-weight:600; letter-spacing:.3em; text-transform:uppercase; text-indent:.3em; color:var(--gold-lt); margin-bottom:18px}
-  .col .big{font-family:var(--display); font-weight:500; font-size:clamp(30px,3.6vw,40px); line-height:1.14; color:var(--cream)}
+  .col .lab{font-size:12.5px; font-weight:400; letter-spacing:.3em; text-transform:uppercase; text-indent:.3em; color:var(--gold-lt); margin-bottom:18px}
+  .col .big{font-family:var(--display); font-weight:400; font-size:clamp(31px,3.7vw,42px); line-height:1.16; color:var(--cream)}
   .col .big .lining{letter-spacing:.01em}
   .col .small{font-size:16.5px; color:#A8B4C8; font-style:italic; margin-top:12px; line-height:1.6}
   .col .small b{color:var(--cream); font-weight:600; font-style:normal}
@@ -142,20 +144,20 @@
   .rsvp-in{max-width:620px; margin:0 auto}
   .rsvp-head{text-align:center; margin-bottom:52px}
   .rsvp-head h2{
-    font-family:var(--display); font-weight:500; font-size:clamp(40px,7vw,62px);
-    letter-spacing:0; color:var(--navy); margin:24px 0 12px;
+    font-family:var(--display); font-weight:400; font-size:clamp(42px,7.2vw,66px);
+    letter-spacing:.01em; color:var(--navy); margin:24px 0 12px;
   }
   .rsvp-head p{font-size:18px; font-style:italic; color:var(--muted); margin:0}
   .rsvp-head .by{
-    display:inline-block; margin-top:20px; font-size:13.5px; font-weight:600; font-style:normal;
-    letter-spacing:.22em; text-transform:uppercase; text-indent:.22em; color:var(--gold);
+    display:inline-block; margin-top:20px; font-size:13px; font-weight:400; font-style:normal;
+    letter-spacing:.24em; text-transform:uppercase; text-indent:.24em; color:var(--gold);
   }
 
   .recap{
     display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 14px;
     border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
     padding:15px 8px; margin:0 0 44px; text-align:center;
-    font-size:13.5px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--navy);
+    font-size:12.5px; font-weight:400; letter-spacing:.18em; text-transform:uppercase; color:var(--navy);
   }
   .recap .rsep{color:var(--gold)}
   .recap a{color:var(--navy); text-decoration:none; border-bottom:1px solid var(--gold-dim); padding-bottom:1px}
@@ -163,10 +165,10 @@
   @media(max-width:640px){ .recap{flex-direction:column; gap:7px} .recap .rsep{display:none} }
 
   .field{margin-bottom:24px}
-  label.lab{display:block; font-size:12.5px; letter-spacing:.22em; text-transform:uppercase; font-weight:600; color:var(--navy); margin-bottom:9px}
+  label.lab{display:block; font-size:12px; letter-spacing:.24em; text-transform:uppercase; font-weight:400; color:var(--navy); margin-bottom:10px}
   label.lab .opt{color:var(--muted); font-weight:400; letter-spacing:.06em; text-transform:none; font-style:italic}
   input[type=text], input[type=email], select, textarea{
-    width:100%; font-family:var(--serif); font-size:19px; color:var(--navy);
+    width:100%; font-family:var(--serif); font-size:18px; color:var(--navy);
     background:var(--paper); border:1px solid var(--rule); border-radius:0;
     padding:15px 16px; outline:none; transition:border-color .15s, box-shadow .15s;
   }
@@ -187,7 +189,7 @@
     background:var(--paper); border:1px solid var(--rule);
     transition:border-color .16s, background .16s, color .16s, box-shadow .16s;
   }
-  .choice .big{display:block; font-family:var(--display); font-size:21px; font-weight:500; letter-spacing:.02em; line-height:1.2}
+  .choice .big{display:block; font-family:var(--display); font-size:22px; font-weight:400; letter-spacing:.02em; line-height:1.22}
   .choice .small{display:block; font-size:13.5px; color:var(--muted); letter-spacing:.04em; font-style:italic}
   .choice > span:hover{border-color:var(--gold)}
   .choice input:focus-visible + span{box-shadow:0 0 0 3px rgba(180,143,69,.3)}
@@ -209,7 +211,7 @@
   .dz:hover{border-color:var(--gold)}
   .dz.over{border-color:var(--navy); border-style:solid; background:#fff}
   .dz svg{width:30px; height:30px; color:var(--gold); margin-bottom:6px}
-  .dz-t{font-family:var(--display); font-size:18px; font-weight:500; color:var(--navy)}
+  .dz-t{font-family:var(--display); font-size:19px; font-weight:400; color:var(--navy)}
   .dz-s{font-size:13px; color:var(--muted); font-style:italic}
   .dz input{position:absolute; width:1px; height:1px; opacity:0; overflow:hidden}
   .dz:focus-within{border-color:var(--navy); box-shadow:0 0 0 3px rgba(180,143,69,.22)}
@@ -227,8 +229,8 @@
   .dz-note.warn{color:#9B2C2C; font-style:normal}
 
   .btn{
-    width:100%; font-family:var(--serif); font-size:15.5px; font-weight:600;
-    letter-spacing:.26em; text-transform:uppercase; text-indent:.26em; color:var(--cream);
+    width:100%; font-family:var(--serif); font-size:14.5px; font-weight:400;
+    letter-spacing:.28em; text-transform:uppercase; text-indent:.28em; color:var(--cream);
     background:var(--navy); border:1px solid var(--navy); padding:20px 22px;
     cursor:pointer; margin-top:10px; transition:background .16s;
   }
@@ -248,17 +250,17 @@
   #done{display:none}
   #done.show{display:block; animation:fade .45s ease}
   @keyframes fade{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
-  .script-accent{font-family:var(--script); font-size:56px; color:var(--gold); text-align:center; line-height:1; margin:0}
-  .done-title{font-family:var(--display); font-weight:500; font-size:clamp(30px,5vw,42px); text-align:center; color:var(--navy); margin:14px 0 10px}
+  .script-accent{font-family:var(--script); font-size:76px; color:var(--gold); text-align:center; line-height:.9; margin:0}
+  .done-title{font-family:var(--display); font-weight:400; font-size:clamp(31px,5.2vw,44px); text-align:center; color:var(--navy); margin:14px 0 10px}
   .done-sub{text-align:center; font-size:17.5px; font-style:italic; color:var(--muted); margin:0 auto 34px; max-width:46ch}
   .done-detail{border-top:1px solid var(--rule); margin:0 0 6px}
   .done-detail .r{display:flex; justify-content:space-between; gap:16px; padding:13px 2px; border-bottom:1px solid var(--rule)}
-  .done-detail .k{font-size:12px; letter-spacing:.2em; text-transform:uppercase; font-weight:600; color:var(--muted); padding-top:4px}
+  .done-detail .k{font-size:11.5px; letter-spacing:.22em; text-transform:uppercase; font-weight:400; color:var(--muted); padding-top:5px}
   .done-detail .v{font-family:var(--display); font-size:17px; text-align:right; color:var(--navy); font-variant-numeric:lining-nums}
   .calbtn{
     display:block; text-align:center; text-decoration:none; margin-top:26px;
-    font-size:13.5px; letter-spacing:.22em; text-transform:uppercase; text-indent:.22em; font-weight:600;
-    color:var(--navy); border:1px solid var(--navy); padding:16px;
+    font-size:13px; letter-spacing:.24em; text-transform:uppercase; text-indent:.24em; font-weight:400;
+    color:var(--navy); border:1px solid var(--navy); padding:17px;
     transition:background .15s, color .15s;
   }
   .calbtn:hover{background:var(--navy); color:var(--cream)}
@@ -267,7 +269,7 @@
 
   /* ======================= FOOTER ======================= */
   .foot{background:var(--navy-ink); color:#8FA0B8; text-align:center; padding:54px 24px 58px; font-size:15px; font-style:italic; line-height:1.7}
-  .foot .fx{font-family:var(--script); font-size:34px; color:var(--gold-lt); font-style:normal; margin-bottom:14px}
+  .foot .fx{font-family:var(--script); font-size:52px; color:var(--gold-lt); font-style:normal; margin-bottom:8px; line-height:1}
   .foot a{color:#C6D0DF}
 </style>
 </head>
@@ -275,22 +277,8 @@
 
 <!-- =============================== HERO =============================== -->
 <header class="hero">
-  <!-- the crest from the invitation: pennant over crossed clubs, EST · 1936 -->
-  <div class="crest" aria-hidden="true">
-    <svg viewBox="0 0 140 116" fill="none">
-      <path d="M70 6v40" stroke="var(--gold)" stroke-width="2.6" stroke-linecap="round"/>
-      <path d="M71.5 7c9.5 1.6 17 5.2 23 9.2-6 4-13.5 7.6-23 9.2V7z" fill="var(--gold)"/>
-      <g stroke="var(--navy)" stroke-width="3" stroke-linecap="round">
-        <path d="M40 34 96 98"/>
-        <path d="M100 34 44 98"/>
-      </g>
-      <path d="M96.5 97c5.5 1 10.5 3.4 13.8 6.6 2.6 2.6 2.4 5.6-.6 7.2-3.6 2-9.4.8-13.4-2.6-2.4-2-3.6-4.4-3.4-6.6" fill="var(--navy)"/>
-      <path d="M43.5 97c-5.5 1-10.5 3.4-13.8 6.6-2.6 2.6-2.4 5.6.6 7.2 3.6 2 9.4.8 13.4-2.6 2.4-2 3.6-4.4 3.4-6.6" fill="var(--navy)"/>
-    </svg>
-    <div class="est lining">
-      <i></i><span>EST.</span><span class="yr">1936</span><i></i>
-    </div>
-  </div>
+  <!-- The crest carries its own EST. / 1936 lockup, so nothing is set in type here. -->
+  <img class="crest" src="images/crest.webp" alt="Crossed golf clubs and a pennant — established 1936" width="1624" height="691">
   <p class="eyebrow">Please join us in celebrating</p>
   <h1>Bob&rsquo;s <em class="lining">90<span class="th">th</span></em></h1>
   <p class="tagline">ninety years well played</p>
@@ -352,11 +340,6 @@
     <div class="field">
       <label class="lab" for="name">Name</label>
       <input type="text" id="name" name="name" placeholder="First and last name" autocomplete="name" required>
-    </div>
-
-    <div class="field">
-      <label class="lab" for="email">Email</label>
-      <input type="email" id="email" name="email" placeholder="you@example.com" autocomplete="email" required>
     </div>
 
     <div class="field">
@@ -429,7 +412,7 @@
 /* ===========================================================================
  * ONE THING TO FILL IN — the Apps Script /exec URL. See setup/SETUP.md.
  * =========================================================================== */
-var ENDPOINT = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
+var ENDPOINT = "https://script.google.com/macros/s/AKfycbz4FEM0omBV4WxlUk5BA9dEyDniZDK3D90-NlOFR8dsDdj9tIlswxuGzPogNaWChYClxg/exec";
 
 var form = document.getElementById('rsvpForm');
 var msg  = document.getElementById('msg');
@@ -564,16 +547,18 @@ function progress(pct, text){
 form.addEventListener('submit', async function(e){
   e.preventDefault();
   var name = document.getElementById('name').value.trim();
-  var email = document.getElementById('email').value.trim();
   var picked = document.querySelector('input[name=attending]:checked');
   var yes = picked && picked.value === 'yes';
 
   if(!name){ show('err','Please enter your name.'); document.getElementById('name').focus(); return; }
-  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ show('err','Please enter a valid email address.'); document.getElementById('email').focus(); return; }
+  /* A single word is almost always a first name only, which makes two "Jim"s
+     impossible to tell apart on the guest list — and the backend now keys on
+     the name, so it would also overwrite one with the other. */
+  if(name.split(/\s+/).length < 2){ show('err','Please include a last name too.'); document.getElementById('name').focus(); return; }
   if(!picked){ show('err','Please let us know whether you can attend.'); return; }
 
   var payload = {
-    type:'rsvp', name:name, email:email,
+    type:'rsvp', name:name,
     attending: yes ? 'yes' : 'no',
     guests: yes ? (document.getElementById('guests').value || '1') : '0',
     photoCount: PHOTOS.length
@@ -591,7 +576,7 @@ form.addEventListener('submit', async function(e){
     for(var i = 0; i < PHOTOS.length; i++){
       progress(10 + Math.round((i / PHOTOS.length) * 88),
                'Uploading photo ' + (i + 1) + ' of ' + PHOTOS.length + '…');
-      await post({ type:'photo', name:name, email:email, filename:PHOTOS[i].name, dataUrl:PHOTOS[i].dataUrl });
+      await post({ type:'photo', name:name, filename:PHOTOS[i].name, dataUrl:PHOTOS[i].dataUrl });
     }
     if(PHOTOS.length) progress(100, 'Done.');
 

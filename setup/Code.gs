@@ -11,13 +11,13 @@
  */
 
 // ===== CONFIG — fill these in =============================================
-var SHEET_ID  = 'PASTE_YOUR_SHEET_ID_HERE';   // from the Sheet's URL
-var ADMIN_KEY = 'PASTE_A_LONG_RANDOM_KEY';    // your password for the admin page
-var NOTIFY_TO = 'arohrlich@gmail.com';        // where notifications land
+var SHEET_ID  = '1HuGBOcoVHWQNzgCX98umGW_d4UBkkMCmYcv7GaFWgRA';
+var ADMIN_KEY = 'bob90-bruin-anchor-2941';    // your password for the admin page
+var NOTIFY_TO = 'dannylewis@gmail.com';        // where notifications land
 var FOLDER_ID = '';                           // leave blank — setup() fills it in
 // ==========================================================================
 
-var HEADERS = ['Timestamp', 'Name', 'Email', 'Attending', 'Party size', 'Photos', 'Photo folder'];
+var HEADERS = ['Timestamp', 'Name', 'Attending', 'Party size', 'Photos', 'Photo folder'];
 
 function doPost(e) {
   try {
@@ -35,68 +35,67 @@ function doPost(e) {
 }
 
 function saveRsvp(p) {
-  var name      = String(p.name  || '').trim().slice(0, 120);
-  var email     = String(p.email || '').trim().slice(0, 160);
+  var name      = String(p.name || '').trim().slice(0, 120);
   var attending = p.attending === 'yes' ? 'yes' : 'no';
   var guests    = attending === 'yes' ? Math.max(1, Math.min(20, parseInt(p.guests, 10) || 1)) : 0;
   var photos    = Math.max(0, Math.min(20, parseInt(p.photoCount, 10) || 0));
 
-  if (!name || !email) return json({ error: 'Name and email are required.' });
+  if (!name) return json({ error: 'A name is required.' });
 
   var sheet = getSheet();
-  var row = findRowByEmail(sheet, email);
+  var row = findRowByName(sheet, name);
 
   /* Someone changing their mind should update their line, not add a second one
      — otherwise the headcount double-counts and you cannot tell which reply is
-     current. Match on email, newest wins. Photos ADD rather than replace: a
-     guest who comes back to send two more should end up with all of them. */
+     current. With no email collected, the name is the only key available; that
+     is why the form insists on a last name. Photos ADD rather than replace, so
+     a guest who comes back to send two more ends up with all of them. */
   var existingPhotos = 0, folderUrl = '';
   if (row > 0) {
-    existingPhotos = parseInt(sheet.getRange(row, 6).getValue(), 10) || 0;
-    folderUrl = sheet.getRange(row, 7).getValue() || '';
+    existingPhotos = parseInt(sheet.getRange(row, 5).getValue(), 10) || 0;
+    folderUrl = sheet.getRange(row, 6).getValue() || '';
   }
 
-  var values = [new Date(), name, email, attending, guests, existingPhotos + photos, folderUrl];
+  var values = [new Date(), name, attending, guests, existingPhotos + photos, folderUrl];
   if (row > 0) sheet.getRange(row, 1, 1, values.length).setValues([values]);
   else         sheet.appendRow(values);
 
-  notify(name, email, attending, guests, photos, row > 0);
+  notify(name, attending, guests, photos, row > 0);
   return json({ ok: true });
 }
 
 function savePhoto(p) {
-  var name  = String(p.name  || 'Guest').trim().slice(0, 120);
-  var email = String(p.email || '').trim().slice(0, 160);
-  var data  = String(p.dataUrl || '');
+  var name = String(p.name || 'Guest').trim().slice(0, 120);
+  var data = String(p.dataUrl || '');
 
   var m = data.match(/^data:(image\/[a-z+.-]+);base64,(.+)$/i);
   if (!m) return json({ error: 'Unreadable image.' });
 
   var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], safeName(name, p.filename));
-  var folder = guestFolder(name, email);
+  var folder = guestFolder(name);
   var file = folder.createFile(blob);
 
   /* Record the folder link on the guest's row the first time they send one, so
      the admin page can link straight to their photos. */
   var sheet = getSheet();
-  var row = findRowByEmail(sheet, email);
-  if (row > 0 && !sheet.getRange(row, 7).getValue()) {
-    sheet.getRange(row, 7).setValue(folder.getUrl());
+  var row = findRowByName(sheet, name);
+  if (row > 0 && !sheet.getRange(row, 6).getValue()) {
+    sheet.getRange(row, 6).setValue(folder.getUrl());
   }
   return json({ ok: true, file: file.getName() });
 }
 
 /** One subfolder per guest, so 40 people's photos don't become one heap. */
-function guestFolder(name, email) {
+function guestFolder(name) {
   var root = DriveApp.getFolderById(getFolderId());
-  var label = (name || 'Guest') + (email ? ' (' + email + ')' : '');
+  var label = name || 'Guest';
   var found = root.getFoldersByName(label);
   return found.hasNext() ? found.next() : root.createFolder(label);
 }
 
 function getFolderId() {
   if (FOLDER_ID) return FOLDER_ID;
-  // Fall back to a property so photos still land somewhere if CONFIG wasn't updated.
+  // Fall back to a stored property so photos still land somewhere if CONFIG wasn't updated.
   var props = PropertiesService.getScriptProperties();
   var id = props.getProperty('PHOTO_FOLDER_ID');
   if (!id) {
@@ -113,14 +112,17 @@ function safeName(guest, filename) {
   return guest.replace(/[^\w\- ]+/g, '') + ' — ' + (base || 'photo') + ' ' + stamp + (ext ? ext[0] : '.jpg');
 }
 
-function findRowByEmail(sheet, email) {
-  if (!email) return -1;
+/** Case- and space-insensitive, so "jim  smith" updates "Jim Smith". */
+function findRowByName(sheet, name) {
+  if (!name) return -1;
+  var key = norm(name);
   var data = sheet.getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][2]).trim().toLowerCase() === email.toLowerCase()) return i + 1;
+    if (norm(data[i][1]) === key) return i + 1;
   }
   return -1;
 }
+function norm(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
 
 /** Admin page reads here: /exec?key=... */
 function doGet(e) {
@@ -130,15 +132,14 @@ function doGet(e) {
   var data = getSheet().getDataRange().getValues();
   var rows = [];
   for (var i = 1; i < data.length; i++) {
-    if (!data[i][1] && !data[i][2]) continue;             // skip blank rows
+    if (!data[i][1]) continue;                             // skip blank rows
     rows.push({
       timestamp:   data[i][0] ? new Date(data[i][0]).toISOString() : '',
       name:        data[i][1],
-      email:       data[i][2],
-      attending:   data[i][3],
-      guests:      data[i][4],
-      photos:      data[i][5],
-      photoFolder: data[i][6]
+      attending:   data[i][2],
+      guests:      data[i][3],
+      photos:      data[i][4],
+      photoFolder: data[i][5]
     });
   }
   rows.sort(function (a, b) { return (b.timestamp || '').localeCompare(a.timestamp || ''); });
@@ -158,21 +159,19 @@ function getSheet() {
     sheet.getRange(1, 1, 1, HEADERS.length).setFontWeight('bold');
     sheet.setFrozenRows(1);
     sheet.setColumnWidth(1, 160);
-    sheet.setColumnWidth(2, 190);
-    sheet.setColumnWidth(3, 230);
-    sheet.setColumnWidth(7, 300);
+    sheet.setColumnWidth(2, 220);
+    sheet.setColumnWidth(6, 300);
   }
   return sheet;
 }
 
-function notify(name, email, attending, guests, photos, isUpdate) {
+function notify(name, attending, guests, photos, isUpdate) {
   var yes = attending === 'yes';
   var subject = (isUpdate ? 'Updated RSVP' : 'RSVP') + ' — ' + name + ' ' +
                 (yes ? 'is coming' + (guests > 1 ? ' (party of ' + guests + ')' : '') : 'cannot make it');
   var body =
     (isUpdate ? 'This guest changed an earlier reply.\n\n' : '') +
     'Name:      ' + name + '\n' +
-    'Email:     ' + email + '\n' +
     'Attending: ' + (yes ? 'Yes' : 'No') + '\n' +
     (yes ? 'Party of:  ' + guests + '\n' : '') +
     (photos ? 'Photos:    ' + photos + ' uploading\n' : '') +
@@ -193,7 +192,7 @@ function json(obj) {
 function setup() {
   var sheet = getSheet();
   var folder = DriveApp.getFolderById(getFolderId());
-  sheet.appendRow([new Date(), 'Test Guest', 'test@example.com', 'yes', 2, 0, '']);
+  sheet.appendRow([new Date(), 'Test Guest', 'yes', 2, 0, '']);
   MailApp.sendEmail(NOTIFY_TO, 'RSVP setup works — Bob’s 90th',
     'Sheet, Drive and email are all working.\n\n' +
     'Photo folder: ' + folder.getUrl() + '\n' +

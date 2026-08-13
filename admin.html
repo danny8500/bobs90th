@@ -140,7 +140,7 @@
       <button          data-f="no"   onclick="setFilter('no',this)">Declined</button>
       <button          data-f="note" onclick="setFilter('note',this)">With photos</button>
     </div>
-    <input type="search" id="q" placeholder="Search name or email&hellip;" oninput="render()">
+    <input type="search" id="q" placeholder="Search by name&hellip;" oninput="render()">
   </div>
 
   <div id="list"></div>
@@ -148,7 +148,7 @@
 
 <script>
 /* Same endpoint as the guest page — paste the Apps Script /exec URL here too. */
-var ENDPOINT = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
+var ENDPOINT = "https://script.google.com/macros/s/AKfycbz4FEM0omBV4WxlUk5BA9dEyDniZDK3D90-NlOFR8dsDdj9tIlswxuGzPogNaWChYClxg/exec";
 
 var ROWS = [], FILTER = 'all', KEY = '', FOLDER_URL = '';
 
@@ -225,7 +225,7 @@ function visible(){
     if(FILTER === 'yes'  && r.attending !== 'yes') return false;
     if(FILTER === 'no'   && r.attending !== 'no')  return false;
     if(FILTER === 'note' && !(parseInt(r.photos, 10) || 0)) return false;
-    if(q && (r.name + ' ' + r.email).toLowerCase().indexOf(q) < 0) return false;
+    if(q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
 }
@@ -252,7 +252,7 @@ function render(){
             : '<span class="num">' + n + '</span>')
         : '<span style="color:#A9B3C1">&mdash;</span>';
       return '<tr>' +
-        '<td><div class="nm">' + esc(r.name) + '</div><div class="em">' + esc(r.email) + '</div></td>' +
+        '<td><div class="nm">' + esc(r.name) + '</div></td>' +
         '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' + (yes ? 'Attending' : 'Declined') + '</span></td>' +
         '<td class="num">' + (yes ? esc(r.guests || '1') : '—') + '</td>' +
         '<td class="note" style="text-align:center">' + photoCell + '</td>' +
@@ -274,9 +274,9 @@ function fmt(ts){
 function exportCsv(){
   var rows = visible();
   if(!rows.length){ alert('Nothing to export.'); return; }
-  var head = ['Name','Email','Attending','Party size','Photos','Photo folder','Received'];
+  var head = ['Name','Attending','Party size','Photos','Photo folder','Received'];
   var body = rows.map(function(r){
-    return [r.name, r.email, r.attending === 'yes' ? 'Yes' : 'No',
+    return [r.name, r.attending === 'yes' ? 'Yes' : 'No',
             r.attending === 'yes' ? (r.guests || '1') : '0',
             parseInt(r.photos, 10) || 0, r.photoFolder || '', fmt(r.timestamp)];
   });
