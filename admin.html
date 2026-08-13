@@ -120,8 +120,15 @@
   .dlg-btns .btn{flex:1; padding:11px}
   .dlg-err{color:var(--red); font-size:13.5px; margin-top:10px; min-height:18px}
 
+  .bigtabs{display:flex; gap:0; margin-bottom:22px; border-bottom:2px solid var(--rule)}
+  .bigtab{font-family:var(--serif); font-size:14px; font-weight:600; letter-spacing:.14em; text-transform:uppercase;
+          color:var(--muted); background:none; border:0; border-bottom:3px solid transparent;
+          padding:12px 22px; cursor:pointer; margin-bottom:-2px}
+  .bigtab.on{color:var(--navy); border-bottom-color:var(--gold)}
+  .bigtab span{color:var(--gold); margin-left:6px; font-variant-numeric:lining-nums}
+
   /* ---- invitations ---- */
-  .invites{margin-top:52px; padding-top:34px; border-top:1px solid var(--rule)}
+  .invites{margin-top:8px; padding-top:0; border-top:0}
   .inv-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:16px}
   .inv-head h2{font-size:15px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; margin:0}
   .inv-stats{font-size:14px; color:var(--muted); font-style:italic}
@@ -176,6 +183,13 @@
 
   <div class="err" id="err"></div>
 
+  <div class="bigtabs">
+    <button class="bigtab on" id="btReplies" onclick="showTab('replies')">Replies <span id="btRN"></span></button>
+    <button class="bigtab" id="btInvites" onclick="showTab('invites')">Invited &middot; awaiting reply <span id="btIN"></span></button>
+  </div>
+
+  <div id="tabReplies">
+
   <div class="stats">
     <div class="stat attend"><div class="n" id="sAttending">&mdash;</div><div class="l">Guests attending</div></div>
     <div class="stat"><div class="n" id="sYes">&mdash;</div><div class="l">Accepted</div></div>
@@ -195,6 +209,9 @@
 
   <div id="list"></div>
 
+  </div>
+
+  <div id="tabInvites" hidden>
   <section class="invites">
     <div class="inv-head">
       <h2>Invitations</h2>
@@ -224,6 +241,7 @@
     </div>
     <div id="invList"></div>
   </section>
+  </div>
 
 </div>
 
@@ -298,7 +316,7 @@ async function load(){
     document.getElementById('lastSync').textContent =
       'Updated ' + new Date().toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}) +
       ' · ' + ROWS.length + ' repl' + (ROWS.length === 1 ? 'y' : 'ies');
-    stats(); render(); renderInvites();
+    stats(); render(); renderInvites(); tabCounts();
   }catch(e){
     err.textContent = e.message || 'Could not load the replies.';
     document.getElementById('lastSync').textContent = 'Not loaded';
@@ -521,7 +539,27 @@ async function doDelete(encName){
  * specific invitation, which is how "who has not replied yet" is answerable at
  * all. A forwarded link with no token still works, it just shows as a walk-in.
  * ------------------------------------------------------------------------- */
-var INVITES = [], SITE = '', INV_FILTER = 'all';
+var INVITES = [], SITE = '', INV_FILTER = 'all', TAB = 'replies';
+
+function showTab(t){
+  TAB = t;
+  document.getElementById('btReplies').classList.toggle('on', t === 'replies');
+  document.getElementById('btInvites').classList.toggle('on', t === 'invites');
+  document.getElementById('tabReplies').hidden = (t !== 'replies');
+  document.getElementById('tabInvites').hidden = (t !== 'invites');
+  /* The invites tab exists to answer "who has not replied yet", so it opens on
+     that filter rather than on All. */
+  if(t === 'invites' && INV_FILTER === 'all'){
+    var b = document.querySelector('#invSeg button[data-if="noreply"]');
+    if(b) setInvFilter('noreply', b);
+  }
+}
+
+function tabCounts(){
+  document.getElementById('btRN').textContent = ROWS.length || '';
+  var waiting = INVITES.filter(function(i){ return !i.replied; }).length;
+  document.getElementById('btIN').textContent = waiting || '';
+}
 
 function setInvFilter(f, btn){
   INV_FILTER = f;

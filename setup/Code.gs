@@ -19,6 +19,7 @@ var ADMIN_KEY = 'oreo';
 var NOTIFY_TO = 'dannylewis@gmail.com';
 var FOLDER_ID = '13iNnfaq5j3TxBaQNCZjtfGo4EljruY9Y';
 var SITE_URL  = 'https://bobs90th.com/';
+var SEND_RSVP_ALERTS = false;   // per-RSVP emails to you; off to save the daily mail quota
 // ==========================================================================
 
 var HEADERS  = ['Timestamp', 'Name', 'Attending', 'Party size', 'Photos', 'Notes', 'Guest names', 'Invite'];
@@ -335,30 +336,30 @@ function inviteImage() {
 }
 
 function inviteHtml(first, link, hasImage) {
+  /* The invitation artwork IS the interface: the whole image is the link, so
+     tapping anywhere - including the printed CLICK TO RSVP - opens the site.
+     The text link below is the fallback for clients that suppress images. */
   var art = hasImage
-    ? '<img src="cid:invite" alt="Bob's 90th Birthday - Saturday, October 17, 2026, Virginia Country Club, Long Beach" ' +
-      'width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;margin:0 auto 26px">'
-    : '';
-  return '' +
-  '<div style="background:#F6F1E3;padding:30px 16px;font-family:Georgia,serif;color:#1B3A63">' +
-    '<div style="max-width:600px;margin:0 auto">' +
-      art +
-      '<div style="text-align:center;padding:0 10px 8px">' +
-        '<div style="font-size:16px;font-style:italic;color:#71809A;margin-bottom:20px">' +
-          'Dear ' + first + ', we would be delighted if you could join us.</div>' +
+    ? '<a href="' + link + '" style="display:block;text-decoration:none">' +
+        '<img src="cid:invite" alt="You are invited to Bob 90th Birthday - tap to RSVP" width="600" ' +
+        'style="display:block;width:100%;max-width:600px;height:auto;border:0;margin:0 auto">' +
+      '</a>'
+    : '<div style="text-align:center;padding:26px 0">' +
         '<a href="' + link + '" style="display:inline-block;background:#1B3A63;color:#F6F1E3;' +
-          'text-decoration:none;padding:17px 46px;font-size:13px;letter-spacing:.26em;' +
-          'text-transform:uppercase;font-family:Georgia,serif">RSVP</a>' +
-        '<div style="font-size:12.5px;color:#71809A;font-style:italic;margin-top:18px">' +
-          'Kindly reply by October 1st</div>' +
-        '<div style="font-size:11.5px;color:#9AA6B8;margin-top:22px;word-break:break-all">' +
-          'Or paste this into your browser:<br>' + link + '</div>' +
+        'text-decoration:none;padding:17px 46px;font-size:13px;letter-spacing:.26em;text-transform:uppercase">RSVP</a>' +
+      '</div>';
+  return '<div style="background:#F6F1E3;padding:26px 14px;font-family:Georgia,serif;color:#1B3A63">' +
+    '<div style="max-width:600px;margin:0 auto">' + art +
+      '<div style="text-align:center;padding:16px 10px 6px">' +
+        '<div style="font-size:12.5px;color:#71809A;font-style:italic">Tap the invitation to reply, or use this link:</div>' +
+        '<div style="font-size:11.5px;margin-top:6px;word-break:break-all">' +
+          '<a href="' + link + '" style="color:#1B3A63">' + link + '</a></div>' +
       '</div>' +
-    '</div>' +
-  '</div>';
+    '</div></div>';
 }
 
 function notify(name, attending, guests, photos, isUpdate, note, names) {
+  if (!SEND_RSVP_ALERTS) return;
   var yes = attending === 'yes';
   var subject = (isUpdate ? 'Updated RSVP' : 'RSVP') + ' - ' + name + ' ' +
                 (yes ? 'is coming' + (guests > 1 ? ' (party of ' + guests + ')' : '') : 'cannot make it');
