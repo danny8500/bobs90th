@@ -64,7 +64,20 @@ function doGet(e) {
     if (irow < 0) return json({ found: false });
     var iv = invitesSheet().getRange(irow, 1, 1, IHEADERS.length).getValues()[0];
     var everyone = String(iv[1] || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
-    return json({ found: true, invite: {
+    /* If this invitation has already been answered, hand the reply back with
+       it. The token is in the link, so a guest opening the email on a second
+       device is recognised there too - browser memory alone cannot do that. */
+    var reply = null;
+    var rrow = findRowByInvite(iv[0]);
+    if (rrow < 0 && everyone[0]) rrow = findRowByName(rsvpSheet(), everyone[0]);
+    if (rrow > 0) {
+      var rv = rsvpSheet().getRange(rrow, 1, 1, HEADERS.length).getValues()[0];
+      reply = { name: rv[1], attending: rv[2], guests: rv[3], photos: rv[4],
+                toast: rv[5], guestNames: rv[6],
+                when: rv[0] ? new Date(rv[0]).toISOString() : '' };
+    }
+
+    return json({ found: true, reply: reply, invite: {
       token: iv[0],
       name:  everyone[0] || '',        // the person the form is filled in as
       names: everyone,                 // everyone on this invitation
@@ -253,9 +266,10 @@ function sendInvites(p) {
 
   try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { quota = 0; }
 
-  /* The artwork IS the invitation. If it cannot be fetched, refuse to send
-     rather than quietly mailing an artless fallback - that is how a broken
-     certificate once sent a test invitation with no picture on it. */
+  /* The email links the artwork rather than attaching it, so this fetch is the
+     proof that the picture will actually load for the recipient. If the site
+     cannot serve it, refuse to send rather than mail a broken image - that is
+     how a broken certificate once sent a test invitation with no picture. */
   var art = inviteImage();
   if (!art) return json({ error: 'Could not load the invitation artwork from the site - nothing was sent. Try again in a minute.' });
 
@@ -278,7 +292,6 @@ function sendInvites(p) {
         body: inviteText(first, link),
         name: "Bob's 90th Birthday"
       };
-      if (art) msg.inlineImages = { invite: art };
       MailApp.sendEmail(msg);
       sheet.getRange(i + 1, 5).setValue(new Date());
       sent++;
@@ -309,8 +322,7 @@ function sendOne(p) {
     subject: "You're invited - Bob's 90th Birthday",
     htmlBody: inviteHtml(first, link, true),
     body: inviteText(first, link),
-    name: "Bob's 90th Birthday",
-    inlineImages: { invite: art }
+    name: "Bob's 90th Birthday"
   });
   invitesSheet().getRange(row, 5).setValue(new Date());
   return json({ ok: true, sent: 1, to: em });
@@ -375,16 +387,20 @@ function inviteImage() {
 function inviteHtml(first, link, hasImage) {
   /* The invitation artwork IS the interface: the whole image is the link, so
      tapping anywhere - including the printed CLICK TO RSVP - opens the site.
-     The text link below is the fallback for clients that suppress images. */
-  var art = hasImage
-    ? '<a href="' + link + '" style="display:block;text-decoration:none">' +
-        '<img src="cid:invite" alt="You are invited to Bob 90th Birthday - tap to RSVP" width="600" ' +
-        'style="display:block;width:100%;max-width:600px;height:auto;border:0;margin:0 auto">' +
-      '</a>'
-    : '<div style="text-align:center;padding:26px 0">' +
-        '<a href="' + link + '" style="display:inline-block;background:#1B3A63;color:#F6F1E3;' +
-        'text-decoration:none;padding:17px 46px;font-size:13px;letter-spacing:.26em;text-transform:uppercase">RSVP</a>' +
-      '</div>';
+
+     The image is LINKED from the site, not attached. Measured in Gmail: an
+     attached (cid:) copy costs ~790ms every single open because Gmail re-serves
+     it from the message each time, while the linked one is ~410ms cold and
+     ~55ms once cached. The trade is that a client set to block external images
+     shows the alt text instead - which is why the plain link below the picture
+     stays, so an RSVP is always one tap away either way.
+
+     height is stated so the layout reserves the space and nothing jumps. */
+  var art = '<a href="' + link + '" style="display:block;text-decoration:none">' +
+      '<img src="' + SITE_URL + 'images/invitation.jpg" ' +
+      'alt="You are invited to Bob 90th Birthday - tap to RSVP" width="600" height="849" ' +
+      'style="display:block;width:100%;max-width:600px;height:auto;border:0;margin:0 auto">' +
+    '</a>';
   return '<div style="background:#F6F1E3;padding:26px 14px;font-family:Georgia,serif;color:#1B3A63">' +
     '<div style="max-width:600px;margin:0 auto">' + art +
       '<div style="text-align:center;padding:16px 10px 6px">' +
@@ -394,6 +410,7 @@ function inviteHtml(first, link, hasImage) {
       '</div>' +
     '</div></div>';
 }
+
 
 function notify(name, attending, guests, photos, isUpdate, note, names) {
   if (!SEND_RSVP_ALERTS) return;
@@ -454,6 +471,17 @@ function stampInvite(token, col) {
   if (row < 0) return;
   var cell = invitesSheet().getRange(row, col);
   if (!cell.getValue()) cell.setValue(new Date());
+}
+
+/** The RSVP row that came from a given invitation, or -1. */
+function findRowByInvite(token) {
+  if (!token) return -1;
+  var sh = rsvpSheet();
+  var data = sh.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][7] || '').trim() === String(token).trim()) return i + 1;
+  }
+  return -1;
 }
 
 function findInvite(token) {

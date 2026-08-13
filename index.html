@@ -429,20 +429,6 @@
       </div>
     </div>
 
-    <div class="field">
-      <label class="lab">Will you be attending?</label>
-      <div class="choices">
-        <label class="choice">
-          <input type="radio" name="attending" value="yes" required>
-          <span><span class="big">Joyfully Accepts</span><span class="small">Count me in</span></span>
-        </label>
-        <label class="choice">
-          <input type="radio" name="attending" value="no" required>
-          <span><span class="big">Regretfully Declines</span><span class="small">Wish I could</span></span>
-        </label>
-      </div>
-    </div>
-
     <div class="field" id="guestRow">
       <label class="lab" for="guests">Total in your party <span class="opt">&mdash; including yourself</span></label>
       <select id="guests" name="guests" class="lining">
@@ -459,6 +445,20 @@
       <label class="lab">Who is coming with you?</label>
       <p class="dz-help">We need everyone by name for the seating chart and place cards.</p>
       <div id="nameSlots"></div>
+    </div>
+
+    <div class="field">
+      <label class="lab">Will you be attending?</label>
+      <div class="choices">
+        <label class="choice">
+          <input type="radio" name="attending" value="yes" required>
+          <span><span class="big">Joyfully Accepts</span><span class="small">Count me in</span></span>
+        </label>
+        <label class="choice">
+          <input type="radio" name="attending" value="no" required>
+          <span><span class="big">Regretfully Declines</span><span class="small">Wish I could</span></span>
+        </label>
+      </div>
     </div>
 
     <div class="field">
@@ -519,16 +519,11 @@ var form = document.getElementById('rsvpForm');
 var msg  = document.getElementById('msg');
 var btn  = document.getElementById('submitBtn');
 
-/* Headcount is meaningless on a "no", and asking anyway is the kind of small
-   rudeness that makes a form feel machine-made. Reveal it only on yes. */
-document.querySelectorAll('input[name=attending]').forEach(function(r){
-  r.addEventListener('change', function(){
-    /* Party size is always on show; only the per-guest name boxes come and go,
-       since names are pointless on a decline. */
-    if(this.value === 'yes') buildSlots();
-    else document.getElementById('namesRow').hidden = true;
-  });
-});
+/* The headcount and the name boxes sit ABOVE the accept/decline question, so
+   they are driven by the number chosen rather than by an answer the guest has
+   not reached yet: pick 2 and a name box appears, whatever they say further
+   down. A decline simply sends a party of zero - the boxes are left alone
+   rather than yanked away under the cursor. */
 document.getElementById('guests').addEventListener('change', buildSlots);
 
 /* One box per additional head. Party of 1 asks for nobody; party of 4 asks for
@@ -565,7 +560,7 @@ function show(kind, text){ msg.className = 'msg ' + kind; msg.textContent = text
  * previously said, and let them either amend it or declare themselves a
  * different person with the same name.
  * ------------------------------------------------------------------------- */
-var EXISTING = null, AMENDING = false;
+var EXISTING = null, AMENDING = false, RECOGNISED = null;
 
 /* ---------------------------------------------------------------------------
  * Browser memory
@@ -597,6 +592,17 @@ async function greetInvitee(){
     if(!d || !d.found) return;
     var inv = d.invite;
 
+    /* Already answered on some other device? Show the reply rather than an
+       empty form, and remember it here so this browser knows it too. */
+    if(d.reply && d.reply.name){
+      saveReply({ name: d.reply.name, attending: d.reply.attending,
+                  guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0 });
+      if(renderReturning(d.reply, true)){
+        markOpenedOnce();
+        return;
+      }
+    }
+
     /* Everything we already know gets filled in: the person it is addressed to,
        how many seats we held, and the names of everyone else on the invitation.
        All of it stays editable — plans change, and an invitation addressed to a
@@ -607,11 +613,8 @@ async function greetInvitee(){
     }
     var seats = parseInt(inv.seats, 10) || 1;
     if(seats > 1){
-      var yesRadio = document.querySelector('input[name=attending][value=yes]');
-      if(yesRadio && !document.querySelector('input[name=attending]:checked')){
-        yesRadio.checked = true;
-        document.getElementById('guestRow').classList.add('show');
-      }
+      /* Their seats are filled in, but accept/decline is left blank - holding
+         two seats is not the same as saying yes on their behalf. */
       var sel = document.getElementById('guests');
       if([].some.call(sel.options, function(o){ return o.value === String(seats); })) sel.value = String(seats);
       buildSlots();
@@ -632,7 +635,12 @@ async function greetInvitee(){
       el.hidden = false;
     }
   }catch(e){}
-  // Record the open regardless of whether the greeting rendered.
+  markOpenedOnce();
+}
+
+/* Records that the invitation link was opened. First write wins server-side,
+   so calling it more than once is harmless. */
+function markOpenedOnce(){
   try{
     fetch(ENDPOINT, { method:'POST', mode:'no-cors',
       headers:{ 'Content-Type':'text/plain;charset=utf-8' },
@@ -657,8 +665,14 @@ function readReply(){
 /* On load, if this browser already replied, show the summary in place of the
    form. Nothing is pre-selected — "Change my reply" opens a blank form. */
 function showReturning(){
-  var r = readReply();
+  return renderReturning(readReply(), false);
+}
+
+/* Renders the "your reply is in" panel from whatever we know - this browser's
+   memory, or the reply the invitation link brought back from the Sheet. */
+function renderReturning(r, fromLink){
   if(!r || !r.name) return false;
+  RECOGNISED = r;
   var yes = r.attending === 'yes';
   var when = '';
   try{
@@ -669,9 +683,16 @@ function showReturning(){
   var rows = '<div class="r"><span class="k">Name</span><span class="v">' + esc(r.name) + '</span></div>'
            + '<div class="r"><span class="k">Reply</span><span class="v">' + (yes ? 'Joyfully accepts' : 'Regretfully declines') + '</span></div>';
   if(yes) rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(r.guests) + '</span></div>';
-  if(r.photos > 0) rows += '<div class="r"><span class="k">Photos</span><span class="v">' + r.photos + ' sent</span></div>';
+  var photoCount = parseInt(r.photos, 10) || 0;
+  if(photoCount > 0) rows += '<div class="r"><span class="k">Photos</span><span class="v">' + photoCount + ' sent</span></div>';
+  if(yes && r.guestNames) rows += '<div class="r"><span class="k">With</span><span class="v">' + esc(r.guestNames) + '</span></div>';
   if(when) rows += '<div class="r"><span class="k">Sent</span><span class="v">' + esc(when) + '</span></div>';
   document.getElementById('retDetail').innerHTML = rows;
+
+  var note = document.querySelector('#returning .ret-note');
+  if(note) note.innerHTML = fromLink
+    ? 'This is the reply we have for your invitation. Change it any time from this link.'
+    : 'Replying from a different phone or computer? Just fill in the form &mdash; we match on your name.';
 
   document.getElementById('returning').hidden = false;
   form.style.display = 'none';
@@ -683,7 +704,7 @@ function showReturning(){
 /* Their own reply, on their own browser — so the name carries over (the update
    has to match the right row) but the answer does not. */
 function changeMyReply(){
-  var r = readReply();
+  var r = RECOGNISED || readReply();
   document.getElementById('returning').hidden = true;
   form.style.display = '';
   document.getElementById('formHead').style.display = '';
@@ -972,6 +993,12 @@ function confirmed(p){
   document.getElementById('doneDetail').innerHTML = rows;
   document.getElementById('calLink').style.display = yes ? '' : 'none';
   if(yes) document.getElementById('calLink').href = calendarFile();
+  /* The reply is in, so the instructions for changing it have served their
+     purpose - leaving them above the confirmation just reads as unfinished. */
+  document.getElementById('amending').hidden = true;
+  var inv = document.getElementById('invited'); if(inv) inv.hidden = true;
+  hideKnown();
+
   document.getElementById('done').classList.add('show');
   document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
 }

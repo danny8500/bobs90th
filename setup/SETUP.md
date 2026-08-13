@@ -88,7 +88,10 @@ press **Add to list**, then send:
 
 Each invitation carries its own link (`bobs90th.com/?i=TOKEN`), which is how the
 list knows who opened it and who replied, and how a couple's names arrive
-pre-filled so they don't retype them.
+pre-filled so they don't retype them. Because the token is in the link, someone
+who replies on their laptop and later opens the same email on their phone is
+shown the reply they already sent, with a button to change it - the phone does
+not need to have been used before.
 
 The email *is* the invitation artwork — the whole picture is the RSVP link. The
 script fetches it from `bobs90th.com/images/invitation.jpg` at send time, so
