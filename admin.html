@@ -82,6 +82,7 @@
   .pill.yes{background:var(--green-bg); color:var(--green)}
   .pill.no{background:var(--red-bg); color:var(--red)}
   .num{text-align:center; font-weight:600}
+  .bringing{font-size:14.5px; color:#3C4E66; max-width:230px; line-height:1.45}
   .note{font-size:14.5px; font-style:italic; color:#3C4E66; max-width:290px; line-height:1.45}
   .when-col{font-size:13px; color:var(--muted); white-space:nowrap}
   @media(max-width:760px){ .note, .when-col, th.note-h, th.when-h{display:none} }
@@ -118,6 +119,30 @@
   .dlg-btns{display:flex; gap:9px; margin-top:20px}
   .dlg-btns .btn{flex:1; padding:11px}
   .dlg-err{color:var(--red); font-size:13.5px; margin-top:10px; min-height:18px}
+
+  /* ---- invitations ---- */
+  .invites{margin-top:52px; padding-top:34px; border-top:1px solid var(--rule)}
+  .inv-head{display:flex; align-items:baseline; justify-content:space-between; gap:16px; flex-wrap:wrap; margin-bottom:16px}
+  .inv-head h2{font-size:15px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; margin:0}
+  .inv-stats{font-size:14px; color:var(--muted); font-style:italic}
+  .inv-stats b{color:var(--navy); font-style:normal; font-weight:600}
+  .inv-add{background:var(--paper); border:1px solid var(--rule); padding:18px 20px; margin-bottom:18px}
+  .inv-add label{display:block; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-bottom:8px}
+  .inv-add label em{text-transform:none; letter-spacing:0}
+  .inv-add textarea{width:100%; font-family:var(--serif); font-size:15px; color:var(--navy);
+    background:var(--cream-2); border:1px solid var(--rule); border-radius:2px; padding:10px 12px; outline:none; resize:vertical}
+  .inv-add textarea:focus{border-color:var(--gold)}
+  .inv-btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+  .inv-msg{font-size:14px; margin-top:11px; min-height:19px; font-style:italic; color:var(--muted)}
+  .inv-msg.err{color:var(--red); font-style:normal}
+  .inv-msg.ok{color:var(--green); font-style:normal}
+  .stage{display:inline-block; font-size:11px; font-weight:600; letter-spacing:.09em; text-transform:uppercase;
+         padding:3px 9px; border-radius:999px; white-space:nowrap}
+  .stage.none{background:var(--cream-2); color:var(--muted)}
+  .stage.sent{background:#EAF0F8; color:#31517C}
+  .stage.open{background:#FBF0DA; color:#8A6A1F}
+  .stage.done{background:var(--green-bg); color:var(--green)}
+  .lnk{font-size:12px; color:var(--muted); word-break:break-all}
 
   .empty{text-align:center; padding:44px 20px; color:var(--muted); font-style:italic; background:var(--paper); border:1px solid var(--rule)}
   .err{background:var(--red-bg); color:var(--red); border:1px solid #E0BDBD; padding:13px 16px; margin-bottom:16px; font-size:15px}
@@ -164,12 +189,40 @@
       <button class="on" data-f="all"  onclick="setFilter('all',this)">All</button>
       <button          data-f="yes"  onclick="setFilter('yes',this)">Attending</button>
       <button          data-f="no"   onclick="setFilter('no',this)">Declined</button>
-      <button          data-f="note" onclick="setFilter('note',this)">With photos</button>
     </div>
     <input type="search" id="q" placeholder="Search by name&hellip;" oninput="render()">
   </div>
 
   <div id="list"></div>
+
+  <section class="invites">
+    <div class="inv-head">
+      <h2>Invitations</h2>
+      <div class="inv-stats" id="invStats"></div>
+    </div>
+
+    <div class="inv-add">
+      <label for="invPaste">Add people &mdash; one invitation per line, <em>Name(s), email@example.com</em>.
+        Join couples with &amp; and both names get saved.</label>
+      <textarea id="invPaste" rows="5" placeholder="Margaret Ellsworth, margaret@example.com&#10;Tom Brady &amp; Elaine Brady, tbrady@example.com&#10;James Whitfield, jwhitfield@example.com"></textarea>
+      <div class="inv-btns">
+        <button class="btn" onclick="addInvites()">Add to list</button>
+        <button class="btn solid" onclick="sendInvites('unsent')">Send to everyone not yet emailed</button>
+        <button class="btn" onclick="sendInvites('noreply')">Remind those who haven't replied</button>
+      </div>
+      <div class="inv-msg" id="invMsg"></div>
+    </div>
+
+    <div class="seg" id="invSeg" style="margin-bottom:14px">
+      <button class="on" data-if="all" onclick="setInvFilter('all',this)">All</button>
+      <button data-if="noreply" onclick="setInvFilter('noreply',this)">No response</button>
+      <button data-if="opened" onclick="setInvFilter('opened',this)">Opened, no reply</button>
+      <button data-if="unsent" onclick="setInvFilter('unsent',this)">Not emailed</button>
+      <button data-if="replied" onclick="setInvFilter('replied',this)">Replied</button>
+    </div>
+    <div id="invList"></div>
+  </section>
+
 </div>
 
 
@@ -187,6 +240,8 @@
     <option>1</option><option>2</option><option>3</option>
     <option>4</option><option>5</option><option>6</option>
   </select>
+  <label for="eGuestNames">Bringing <span style="text-transform:none;letter-spacing:0;font-style:italic">(comma separated)</span></label>
+  <input type="text" id="eGuestNames">
   <label for="eToast">Notes</label>
   <textarea id="eToast"></textarea>
   <div class="dlg-err" id="eErr"></div>
@@ -236,10 +291,12 @@ async function load(){
     }
     ROWS = d.rows || [];
     FOLDER_URL = d.folderUrl || '';
+    INVITES = d.invites || [];
+    SITE = d.siteUrl || 'https://bobs90th.com/';
     document.getElementById('lastSync').textContent =
       'Updated ' + new Date().toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}) +
       ' · ' + ROWS.length + ' repl' + (ROWS.length === 1 ? 'y' : 'ies');
-    stats(); render();
+    stats(); render(); renderInvites();
   }catch(e){
     err.textContent = e.message || 'Could not load the replies.';
     document.getElementById('lastSync').textContent = 'Not loaded';
@@ -251,6 +308,10 @@ async function load(){
 function stats(){
   var yes = ROWS.filter(function(r){ return r.attending === 'yes'; });
   var heads = yes.reduce(function(n,r){ return n + (parseInt(r.guests,10) || 1); }, 0);
+  var named = yes.reduce(function(n,r){
+    var extra = String(r.guestNames || '').split(',').filter(function(x){ return x.trim(); }).length;
+    return n + 1 + extra;
+  }, 0);
   var pics  = ROWS.reduce(function(n,r){ return n + (parseInt(r.photos,10) || 0); }, 0);
   document.getElementById('sAttending').textContent = heads;
   document.getElementById('sYes').textContent = yes.length;
@@ -274,7 +335,6 @@ function visible(){
   return ROWS.filter(function(r){
     if(FILTER === 'yes'  && r.attending !== 'yes') return false;
     if(FILTER === 'no'   && r.attending !== 'no')  return false;
-    if(FILTER === 'note' && !(parseInt(r.photos, 10) || 0)) return false;
     if(q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
@@ -291,8 +351,8 @@ function render(){
   el.innerHTML =
     '<table><thead><tr>' +
       '<th>Guest</th><th>Reply</th><th style="text-align:center">Party</th>' +
-      '<th style="text-align:center">Photos</th><th class="note-h">Notes</th>' +
-      '<th class="when-h">Received</th><th></th>' +
+      '<th>Bringing</th><th style="text-align:center">Photos</th>' +
+      '<th class="note-h">Notes</th><th class="when-h">Received</th><th></th>' +
     '</tr></thead><tbody>' +
     rows.map(function(r){
       var yes = r.attending === 'yes';
@@ -302,6 +362,7 @@ function render(){
         '<td><div class="nm">' + esc(r.name) + '</div></td>' +
         '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' + (yes ? 'Attending' : 'Declined') + '</span></td>' +
         '<td class="num">' + (yes ? esc(r.guests || '1') : '—') + '</td>' +
+        '<td class="bringing">' + (r.guestNames ? esc(r.guestNames) : '<span style="color:#A9B3C1">—</span>') + '</td>' +
         '<td class="num">' + (n ? n : '<span style="color:#A9B3C1">—</span>') + '</td>' +
         '<td class="note">' + (r.toast ? esc(r.toast) : '<span style="color:#A9B3C1">—</span>') + '</td>' +
         '<td class="when-col">' + esc(fmt(r.timestamp)) + '</td>' +
@@ -326,11 +387,11 @@ function fmt(ts){
 function exportCsv(){
   var rows = visible();
   if(!rows.length){ alert('Nothing to export.'); return; }
-  var head = ['Name','Attending','Party size','Photos','Photo folder','Received'];
+  var head = ['Name','Attending','Party size','Bringing','Photos','Notes','Received'];
   var body = rows.map(function(r){
     return [r.name, r.attending === 'yes' ? 'Yes' : 'No',
             r.attending === 'yes' ? (r.guests || '1') : '0',
-            parseInt(r.photos, 10) || 0, r.photoFolder || '', fmt(r.timestamp)];
+            r.guestNames || '', parseInt(r.photos, 10) || 0, r.toast || '', fmt(r.timestamp)];
   });
   var csv = [head].concat(body).map(function(cols){
     return cols.map(function(c){ return '"' + String(c == null ? '' : c).replace(/"/g,'""') + '"'; }).join(',');
@@ -371,6 +432,7 @@ function openEdit(encName){
   document.getElementById('eName').value = r.name;
   document.getElementById('eAttending').value = r.attending === 'yes' ? 'yes' : 'no';
   document.getElementById('eGuests').value = String(parseInt(r.guests, 10) || 1);
+  document.getElementById('eGuestNames').value = r.guestNames || '';
   document.getElementById('eToast').value = r.toast || '';
   document.getElementById('eErr').textContent = '';
   syncGuestState();
@@ -420,6 +482,7 @@ async function saveEdit(){
       name: name,
       attending: attending,
       guests: attending === 'yes' ? document.getElementById('eGuests').value : '0',
+      guestNames: document.getElementById('eGuestNames').value.trim(),
       toast: document.getElementById('eToast').value.trim()
     });
     closeEdit();
@@ -447,6 +510,145 @@ async function doDelete(encName){
     document.getElementById('err').textContent = e.message || 'Could not delete that.';
   }
 }
+
+
+/* ---------------------------------------------------------------------------
+ * Invitations
+ * Each person on the list gets a token, and the invitation email links to
+ * bobs90th.com/?i=TOKEN. That token is what lets an RSVP be attributed to a
+ * specific invitation, which is how "who has not replied yet" is answerable at
+ * all. A forwarded link with no token still works, it just shows as a walk-in.
+ * ------------------------------------------------------------------------- */
+var INVITES = [], SITE = '', INV_FILTER = 'all';
+
+function setInvFilter(f, btn){
+  INV_FILTER = f;
+  document.querySelectorAll('#invSeg button').forEach(function(b){ b.classList.toggle('on', b === btn); });
+  renderInvites();
+}
+
+/* "No response" is the list that actually gets used — it is who still needs
+   chasing, so it counts anyone without a reply whether or not they opened. */
+function invVisible(){
+  return INVITES.filter(function(i){
+    if(INV_FILTER === 'noreply') return !i.replied;
+    if(INV_FILTER === 'opened')  return i.opened && !i.replied;
+    if(INV_FILTER === 'unsent')  return !i.sent;
+    if(INV_FILTER === 'replied') return !!i.replied;
+    return true;
+  });
+}
+
+function invMsg(text, kind){
+  var el = document.getElementById('invMsg');
+  el.textContent = text || '';
+  el.className = 'inv-msg' + (kind ? ' ' + kind : '');
+}
+
+async function addInvites(){
+  var raw = document.getElementById('invPaste').value.trim();
+  if(!raw){ invMsg('Paste in some names and emails first.', 'err'); return; }
+
+  /* Accept "Name, email", "Name <email>" or "email" alone — people paste all
+     three, and rejecting two of them would just be pedantry. */
+  var people = [], bad = 0;
+  raw.split(NEWLINE).forEach(function(line){
+    line = line.trim();
+    if(!line) return;
+    var m = line.match(/^(.*?)[,;<]?\s*([^\s,;<>]+@[^\s,;<>]+\.[^\s,;<>]+)>?$/);
+    if(!m){ bad++; return; }
+    var email = m[2].trim();
+    var whole = m[1].replace(/[,;<]\s*$/, '').trim() || email.split('@')[0];
+    /* "Tom Brady & Elaine Brady" is two people on one invitation. Split so we
+       store both names and can pre-fill them, rather than treating the pair as
+       a single oddly-punctuated guest. */
+    var names = whole.split(/\s*(?:&|and|\+)\s*/i)
+                     .map(function(x){ return x.trim(); })
+                     .filter(Boolean);
+    people.push({ name: names.join(', '), seats: names.length, email: email });
+  });
+  if(!people.length){ invMsg('Could not read an email address on any line.', 'err'); return; }
+
+  invMsg('Adding ' + people.length + '...');
+  try{
+    var d = await adminPost({ type:'admin-add-invites', people: people });
+    invMsg('Added ' + d.added + (d.updated ? ', updated ' + d.updated : '') +
+           (bad ? ' — ' + bad + ' line(s) had no email and were skipped' : '') + '.', 'ok');
+    document.getElementById('invPaste').value = '';
+    await load();
+  }catch(e){ invMsg(e.message || 'Could not add those.', 'err'); }
+}
+
+async function sendInvites(only){
+  var n = INVITES.filter(function(i){
+    return only === 'unsent' ? !i.sent : !i.replied;
+  }).length;
+  if(!n){ invMsg(only === 'unsent' ? 'Everyone has already been emailed.' : 'Everyone has replied.', 'ok'); return; }
+  var what = only === 'unsent' ? 'Send the invitation to ' + n + ' person/people?'
+                               : 'Send a reminder to ' + n + " who have not replied?";
+  if(!confirm(what)) return;
+
+  invMsg('Sending...');
+  try{
+    var d = await adminPost({ type:'admin-send', only: only });
+    var msg = 'Sent ' + d.sent + '.';
+    if(d.failed)  msg += ' ' + d.failed + ' failed.';
+    /* Consumer Gmail allows roughly 100 a day. Say so plainly rather than
+       letting the rest vanish without explanation. */
+    if(d.skipped) msg += ' ' + d.skipped + ' skipped (already sent, or the daily limit was reached).';
+    msg += ' Quota left today: ' + d.quotaLeft + '.';
+    invMsg(msg, 'ok');
+    await load();
+  }catch(e){ invMsg(e.message || 'Could not send.', 'err'); }
+}
+
+async function delInvite(token){
+  if(!confirm('Remove this invitation? Their RSVP, if any, is not affected.')) return;
+  try{ await adminPost({ type:'admin-del-invite', token: token }); await load(); }
+  catch(e){ invMsg(e.message || 'Could not remove it.', 'err'); }
+}
+
+function renderInvites(){
+  var el = document.getElementById('invList');
+  var st = document.getElementById('invStats');
+  if(!INVITES.length){
+    st.textContent = '';
+    el.innerHTML = '<div class="empty">No invitations yet. Add people above, then send.</div>';
+    return;
+  }
+  var sent = INVITES.filter(function(i){ return i.sent; }).length;
+  var opened = INVITES.filter(function(i){ return i.opened; }).length;
+  var replied = INVITES.filter(function(i){ return i.replied; }).length;
+  st.innerHTML = '<b>' + INVITES.length + '</b> invited &middot; <b>' + sent + '</b> emailed &middot; ' +
+                 '<b>' + opened + '</b> opened &middot; <b>' + replied + '</b> replied &middot; ' +
+                 '<b>' + (INVITES.length - replied) + '</b> outstanding';
+
+  var list = invVisible();
+  if(!list.length){
+    el.innerHTML = '<div class="empty">Nobody in this group.</div>';
+    return;
+  }
+  el.innerHTML = '<table><thead><tr>' +
+      '<th>Invited</th><th style="text-align:center">Seats</th><th>Email</th><th>Status</th><th class="when-h">Emailed</th><th></th>' +
+    '</tr></thead><tbody>' +
+    list.map(function(i){
+      var stage = i.replied ? ['done','Replied'] : i.opened ? ['open','Opened, no reply'] :
+                  i.sent ? ['sent','Emailed'] : ['none','Not emailed'];
+      return '<tr>' +
+        '<td><div class="nm">' + esc(i.name) + '</div><div class="lnk">' + esc(SITE + '?i=' + i.token) + '</div></td>' +
+        '<td class="num">' + esc(i.seats || 1) + '</td>' +
+        '<td class="em">' + esc(i.email) + '</td>' +
+        '<td><span class="stage ' + stage[0] + '">' + stage[1] + '</span></td>' +
+        '<td class="when-col">' + (i.sent ? esc(fmt(i.sent)) : '—') + '</td>' +
+        '<td class="acts"><button class="mini del" data-inv="' + esc(i.token) + '">Remove</button></td>' +
+      '</tr>';
+    }).join('') + '</tbody></table>';
+}
+
+document.getElementById('invList').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-inv]');
+  if(b) delInvite(b.dataset.inv);
+});
 
 function esc(s){
   return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){

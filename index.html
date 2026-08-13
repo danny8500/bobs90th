@@ -248,6 +248,11 @@
   .amending[hidden]{display:none}
   .amending b{font-style:normal; color:var(--navy); font-weight:400}
 
+  #namesRow[hidden]{display:none}
+  .slot{display:flex; align-items:center; gap:12px; margin-bottom:9px}
+  .slot .n{flex:none; width:74px; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
+  .slot input{flex:1}
+
   #guestRow{display:none}
   #guestRow.show{display:block; animation:slidein .3s ease}
   @keyframes slidein{from{opacity:0; transform:translateY(-5px)}to{opacity:1; transform:none}}
@@ -405,6 +410,7 @@
       we match on your name.</p>
   </div>
 
+  <div class="amending" id="invited" hidden></div>
   <div class="amending" id="amending" hidden></div>
 
   <form id="rsvpForm" novalidate>
@@ -445,6 +451,12 @@
         <option value="5">5 guests</option>
         <option value="6">6 guests</option>
       </select>
+    </div>
+
+    <div class="field" id="namesRow" hidden>
+      <label class="lab">Who is coming with you?</label>
+      <p class="dz-help">We need everyone by name for the seating chart and place cards.</p>
+      <div id="nameSlots"></div>
     </div>
 
     <div class="field">
@@ -509,9 +521,34 @@ var btn  = document.getElementById('submitBtn');
    rudeness that makes a form feel machine-made. Reveal it only on yes. */
 document.querySelectorAll('input[name=attending]').forEach(function(r){
   r.addEventListener('change', function(){
-    document.getElementById('guestRow').classList.toggle('show', this.value === 'yes');
+    var yes = this.value === 'yes';
+    document.getElementById('guestRow').classList.toggle('show', yes);
+    if(!yes) document.getElementById('namesRow').hidden = true; else buildSlots();
   });
 });
+document.getElementById('guests').addEventListener('change', buildSlots);
+
+/* One box per additional head. Party of 1 asks for nobody; party of 4 asks for
+   three names. Existing entries survive a change of count, so bumping 3 to 4
+   does not wipe what they already typed. */
+function buildSlots(){
+  var n = parseInt(document.getElementById('guests').value, 10) || 1;
+  var wrap = document.getElementById('nameSlots');
+  var had = [].map.call(wrap.querySelectorAll('input'), function(i){ return i.value; });
+  var html = '';
+  for(var i = 2; i <= n; i++){
+    html += '<div class="slot"><span class="n">Guest ' + i + '</span>' +
+            '<input type="text" class="gname" placeholder="First and last name" value="' +
+            esc(had[i-2] || '') + '"></div>';
+  }
+  wrap.innerHTML = html;
+  document.getElementById('namesRow').hidden = (n < 2);
+}
+
+function collectGuestNames(){
+  return [].map.call(document.querySelectorAll('#nameSlots input'), function(i){ return i.value.trim(); })
+           .filter(Boolean).join(', ');
+}
 
 function show(kind, text){ msg.className = 'msg ' + kind; msg.textContent = text; }
 
@@ -534,6 +571,72 @@ var EXISTING = null, AMENDING = false;
  * browser or reply from another device the page simply behaves as a first
  * visit, and the name lookup still catches the duplicate.
  * ------------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------------
+ * Invitation links
+ * Every invitation email carries ?i=TOKEN. We tell the backend the link was
+ * opened (once), greet them by name, and send the token back with the reply so
+ * the RSVP is attributable to that invitation. A link with no token still works
+ * — it just lands as an untracked walk-in, which is what you want when someone
+ * forwards the link to a friend.
+ * ------------------------------------------------------------------------- */
+var INVITE_TOKEN = '';
+(function(){
+  try{
+    var t = new URLSearchParams(location.search).get('i');
+    if(t) INVITE_TOKEN = t.trim().slice(0, 24);
+  }catch(e){}
+})();
+
+async function greetInvitee(){
+  if(!INVITE_TOKEN || ENDPOINT.indexOf('PASTE_') === 0) return;
+  try{
+    var d = await fetch(ENDPOINT + '?invite=' + encodeURIComponent(INVITE_TOKEN)).then(function(r){ return r.json(); });
+    if(!d || !d.found) return;
+    var inv = d.invite;
+
+    /* Everything we already know gets filled in: the person it is addressed to,
+       how many seats we held, and the names of everyone else on the invitation.
+       All of it stays editable — plans change, and an invitation addressed to a
+       couple is often answered by one of them. */
+    if(!nameEl.value && inv.name){
+      nameEl.value = inv.name;
+      lastLooked = String(inv.name).toLowerCase();
+    }
+    var seats = parseInt(inv.seats, 10) || 1;
+    if(seats > 1){
+      var yesRadio = document.querySelector('input[name=attending][value=yes]');
+      if(yesRadio && !document.querySelector('input[name=attending]:checked')){
+        yesRadio.checked = true;
+        document.getElementById('guestRow').classList.add('show');
+      }
+      var sel = document.getElementById('guests');
+      if([].some.call(sel.options, function(o){ return o.value === String(seats); })) sel.value = String(seats);
+      buildSlots();
+      var extra = (inv.names || []).slice(1);
+      [].forEach.call(document.querySelectorAll('#nameSlots input'), function(input, i){
+        if(extra[i]) input.value = extra[i];
+      });
+    }
+
+    var el = document.getElementById('invited');
+    if(el){
+      var who = (inv.names && inv.names.length > 1)
+        ? esc(inv.names.join(' and '))
+        : '<b>' + esc(String(inv.name).split(/\s+/)[0]) + '</b>';
+      el.innerHTML = 'Welcome, ' + who + '. Your invitation is recognised' +
+        (seats > 1 ? ' — we have you down for ' + seats + '. ' : '. ') +
+        'Everything below is editable.';
+      el.hidden = false;
+    }
+  }catch(e){}
+  // Record the open regardless of whether the greeting rendered.
+  try{
+    fetch(ENDPOINT, { method:'POST', mode:'no-cors',
+      headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+      body: JSON.stringify({ type:'opened', invite: INVITE_TOKEN }) });
+  }catch(e){}
+}
+
 var STORE_KEY = 'bob90.reply';
 
 function saveReply(p){
@@ -790,13 +893,25 @@ form.addEventListener('submit', async function(e){
      the name, so it would also overwrite one with the other. */
   if(name.split(/\s+/).length < 2){ show('err','Please include a last name too.'); document.getElementById('name').focus(); return; }
   if(!picked){ show('err','Please let us know whether you can attend.'); return; }
+  if(yes){
+    var want = (parseInt(document.getElementById('guests').value, 10) || 1) - 1;
+    var got = collectGuestNames().split(',').filter(function(x){ return x.trim(); }).length;
+    if(got < want){
+      show('err','Please add the name of everyone in your party — we need them for the seating chart.');
+      var blank = document.querySelector('#nameSlots input[value=""], #nameSlots input:not([value])');
+      (blank || document.querySelector('#nameSlots input')).focus();
+      return;
+    }
+  }
 
   var payload = {
     type:'rsvp', name:name,
     attending: yes ? 'yes' : 'no',
     guests: yes ? (document.getElementById('guests').value || '1') : '0',
     photoCount: PHOTOS.length,
-    toast: document.getElementById('toast').value.trim()
+    toast: document.getElementById('toast').value.trim(),
+    guestNames: yes ? collectGuestNames() : '',
+    invite: INVITE_TOKEN
   };
 
   btn.disabled = true; btn.textContent = 'Sending…'; show('', '');
@@ -847,6 +962,7 @@ function confirmed(p){
   }
   if(yes){
     rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(p.guests) + '</span></div>'
+          + (p.guestNames ? '<div class="r"><span class="k">With</span><span class="v">' + esc(p.guestNames) + '</span></div>' : '')
           + '<div class="r"><span class="k">When</span><span class="v">Sat, Oct 17, 2026 &middot; Cocktails 5:00</span></div>'
           + '<div class="r"><span class="k">Where</span><span class="v">Virginia Country Club, Long Beach</span></div>';
   }
@@ -893,7 +1009,7 @@ function esc(s){
 }
 
 /* Last: if this browser already replied, swap the form for the summary. */
-try{ showReturning(); }catch(e){}
+try{ if(!showReturning()) greetInvitee(); }catch(e){}
 </script>
 </body>
 </html>
