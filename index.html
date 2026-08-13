@@ -133,6 +133,13 @@
   .col .small b{color:var(--cream); font-weight:600; font-style:normal}
   .col a{color:var(--gold-lt); text-decoration:none; border-bottom:1px solid var(--gold-dim); padding-bottom:1px}
   .col a:hover{color:#fff; border-color:#fff}
+  .dress{text-align:center; margin-top:66px; padding-top:34px; border-top:1px solid var(--gold-dim)}
+  .dress-lab{display:block; font-size:12.5px; font-weight:400; letter-spacing:.3em;
+             text-transform:uppercase; text-indent:.3em; color:var(--gold-lt); margin-bottom:12px}
+  .dress-v{display:block; font-family:var(--display); font-weight:400;
+           font-size:clamp(27px,3.3vw,36px); color:var(--cream); line-height:1.15}
+  .dress-note{display:block; font-size:15.5px; font-style:italic; color:#A8B4C8; margin-top:9px}
+
   .col .vsep{width:34px; height:1px; background:var(--gold-dim); margin:16px auto 14px}
 
   /* ======================= RSVP ======================= */
@@ -167,6 +174,7 @@
   .field{margin-bottom:24px}
   label.lab{display:block; font-size:12px; letter-spacing:.24em; text-transform:uppercase; font-weight:400; color:var(--navy); margin-bottom:10px}
   label.lab .opt{color:var(--muted); font-weight:400; letter-spacing:.06em; text-transform:none; font-style:italic}
+  textarea{resize:vertical; min-height:92px; line-height:1.55; font-style:italic}
   input[type=text], input[type=email], select, textarea{
     width:100%; font-family:var(--serif); font-size:18px; color:var(--navy);
     background:var(--paper); border:1px solid var(--rule); border-radius:0;
@@ -214,6 +222,23 @@
   .known button:hover{background:var(--navy-deep)}
   .known .known-n{background:transparent; color:var(--navy); border-color:var(--rule)}
   .known .known-n:hover{background:transparent; border-color:var(--navy)}
+  /* ---- returning visitor: this browser remembers a reply ---- */
+  .returning{text-align:center; padding:8px 0 4px}
+  .returning[hidden]{display:none}
+  .ret-t{font-family:var(--display); font-weight:400; font-size:clamp(28px,4.6vw,38px);
+         color:var(--navy); margin:12px 0 22px}
+  .ret-detail{border-top:1px solid var(--rule); text-align:left; margin-bottom:26px}
+  .ret-detail .r{display:flex; justify-content:space-between; gap:16px; padding:13px 2px; border-bottom:1px solid var(--rule)}
+  .ret-detail .k{font-size:11.5px; letter-spacing:.22em; text-transform:uppercase; color:var(--muted); padding-top:5px}
+  .ret-detail .v{font-family:var(--display); font-size:17px; text-align:right; color:var(--navy); font-variant-numeric:lining-nums}
+  .ret-btn{
+    font-family:var(--serif); font-size:13.5px; font-weight:400; letter-spacing:.24em;
+    text-transform:uppercase; text-indent:.24em; padding:17px 40px; cursor:pointer;
+    color:var(--cream); background:var(--navy); border:1px solid var(--navy); transition:background .15s;
+  }
+  .ret-btn:hover{background:var(--navy-deep)}
+  .ret-note{font-size:14px; font-style:italic; color:var(--muted); margin:20px auto 0; max-width:44ch; line-height:1.55}
+
   /* the banner that stays put once they choose to amend */
   .amending{
     margin-bottom:22px; padding:13px 16px; background:var(--paper);
@@ -340,6 +365,12 @@
         <div class="small lining">Ninety years of golf, Bruin pride,<br>and slow cruises on Bob&rsquo;n Along.<br>Come raise a glass.</div>
       </div>
     </div>
+
+    <div class="dress">
+      <span class="dress-lab">Dress</span>
+      <span class="dress-v">Cocktail attire</span>
+      <span class="dress-note">Jacket optional &middot; no need for a suit</span>
+    </div>
   </div>
 </section>
 
@@ -360,7 +391,18 @@
   <div class="recap lining" id="recap">
     <span>Sat, October 17, 2026</span><span class="rsep">&middot;</span>
     <span>Cocktails 5:00 &middot; Dinner 6:30</span><span class="rsep">&middot;</span>
-    <span><a href="https://maps.google.com/?q=500+Virginia+Country+Club+Road,+Long+Beach,+CA+90807" target="_blank" rel="noopener">Virginia Country Club, Long Beach</a></span>
+    <span><a href="https://maps.google.com/?q=500+Virginia+Country+Club+Road,+Long+Beach,+CA+90807" target="_blank" rel="noopener">Virginia Country Club, Long Beach</a></span><span class="rsep">&middot;</span>
+    <span>Cocktail attire</span>
+  </div>
+
+  <!-- Shown INSTEAD of the form when this browser remembers a reply. -->
+  <div class="returning" id="returning" hidden>
+    <div class="script-accent">Thank you!</div>
+    <h3 class="ret-t">Your Reply Is In</h3>
+    <div class="ret-detail" id="retDetail"></div>
+    <button type="button" class="ret-btn" onclick="changeMyReply()">Change my reply</button>
+    <p class="ret-note">Replying from a different phone or computer? Just fill in the form &mdash;
+      we match on your name.</p>
   </div>
 
   <div class="amending" id="amending" hidden></div>
@@ -373,8 +415,8 @@
         <div class="known-t" id="knownT"></div>
         <div class="known-s" id="knownS"></div>
         <div class="known-btns">
-          <button type="button" class="known-y" onclick="loadExisting()">Yes, change my reply</button>
-          <button type="button" class="known-n" onclick="dismissKnown()">No, that&rsquo;s someone else</button>
+          <button type="button" class="known-y" onclick="allowChange()">Change that reply</button>
+          <button type="button" class="known-n" onclick="dismissKnown()">That&rsquo;s someone else</button>
         </div>
       </div>
     </div>
@@ -403,6 +445,14 @@
         <option value="5">5 guests</option>
         <option value="6">6 guests</option>
       </select>
+    </div>
+
+    <div class="field">
+      <label class="lab" for="toast">Anything else we should know? <span class="opt">&mdash; optional</span></label>
+      <p class="dz-help">Bringing the kids, arriving late, might have to cancel,
+        dietary needs &mdash; anything at all.</p>
+      <textarea id="toast" name="toast" rows="3" maxlength="1200"
+        placeholder="Tell us here&hellip;"></textarea>
     </div>
 
     <div class="field">
@@ -465,6 +515,8 @@ document.querySelectorAll('input[name=attending]').forEach(function(r){
 
 function show(kind, text){ msg.className = 'msg ' + kind; msg.textContent = text; }
 
+/* kicked off at the bottom of this script, once everything is defined */
+
 /* ---------------------------------------------------------------------------
  * "Haven't you already replied?"
  * The backend keys on name, so a second reply from the same person overwrites
@@ -474,6 +526,77 @@ function show(kind, text){ msg.className = 'msg ' + kind; msg.textContent = text
  * different person with the same name.
  * ------------------------------------------------------------------------- */
 var EXISTING = null, AMENDING = false;
+
+/* ---------------------------------------------------------------------------
+ * Browser memory
+ * localStorage, not a cookie: it is never sent to a server, so this is purely a
+ * convenience for the guest and adds nothing to track. If they clear their
+ * browser or reply from another device the page simply behaves as a first
+ * visit, and the name lookup still catches the duplicate.
+ * ------------------------------------------------------------------------- */
+var STORE_KEY = 'bob90.reply';
+
+function saveReply(p){
+  try{
+    localStorage.setItem(STORE_KEY, JSON.stringify({
+      name: p.name, attending: p.attending, guests: p.guests,
+      photos: p.photoCount || 0, when: new Date().toISOString()
+    }));
+  }catch(e){ /* private mode — the page still works, it just will not remember */ }
+}
+function readReply(){
+  try{ return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); }catch(e){ return null; }
+}
+
+/* On load, if this browser already replied, show the summary in place of the
+   form. Nothing is pre-selected — "Change my reply" opens a blank form. */
+function showReturning(){
+  var r = readReply();
+  if(!r || !r.name) return false;
+  var yes = r.attending === 'yes';
+  var when = '';
+  try{
+    var d = new Date(r.when);
+    if(!isNaN(d)) when = d.toLocaleDateString(undefined,{month:'long', day:'numeric'});
+  }catch(e){}
+
+  var rows = '<div class="r"><span class="k">Name</span><span class="v">' + esc(r.name) + '</span></div>'
+           + '<div class="r"><span class="k">Reply</span><span class="v">' + (yes ? 'Joyfully accepts' : 'Regretfully declines') + '</span></div>';
+  if(yes) rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(r.guests) + '</span></div>';
+  if(r.photos > 0) rows += '<div class="r"><span class="k">Photos</span><span class="v">' + r.photos + ' sent</span></div>';
+  if(when) rows += '<div class="r"><span class="k">Sent</span><span class="v">' + esc(when) + '</span></div>';
+  document.getElementById('retDetail').innerHTML = rows;
+
+  document.getElementById('returning').hidden = false;
+  form.style.display = 'none';
+  document.getElementById('formHead').style.display = 'none';
+  var recap = document.getElementById('recap'); if(recap) recap.style.display = 'none';
+  return true;
+}
+
+/* Their own reply, on their own browser — so the name carries over (the update
+   has to match the right row) but the answer does not. */
+function changeMyReply(){
+  var r = readReply();
+  document.getElementById('returning').hidden = true;
+  form.style.display = '';
+  document.getElementById('formHead').style.display = '';
+  var recap = document.getElementById('recap'); if(recap) recap.style.display = '';
+
+  if(r && r.name){
+    nameEl.value = r.name;
+    lastLooked = r.name.toLowerCase();   // suppress the "already replied" notice; they know
+    AMENDING = true;
+    var banner = document.getElementById('amending');
+    banner.innerHTML = 'Changing the reply for <b>' + esc(r.name) + '</b>. ' +
+      'Choose your answer below — it replaces the previous one. ' +
+      'Photos already sent are kept, and new ones are added.';
+    banner.hidden = false;
+    btn.textContent = 'Update My Reply';
+  }
+  document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
+}
+
 var nameEl = document.getElementById('name');
 var knownEl = document.getElementById('known');
 
@@ -502,45 +625,26 @@ async function maybeLookup(){
 function showKnown(r){
   EXISTING = r;
   var yes = r.attending === 'yes';
-  var when = '';
-  try{
-    var d = new Date(r.when);
-    if (!isNaN(d)) when = ' on ' + d.toLocaleDateString(undefined, { month:'long', day:'numeric' });
-  }catch(e){}
-
-  document.getElementById('knownT').textContent = 'It looks like you have already replied.';
+  document.getElementById('knownT').textContent = 'That name has already replied.';
   document.getElementById('knownS').innerHTML =
-    esc(r.name) + ' replied' + when + ': <b style="font-style:normal;color:var(--navy);font-weight:400">' +
-    (yes ? 'joyfully accepts' + (r.guests > 1 ? ', party of ' + r.guests : '') : 'regretfully declines') +
-    '</b>' + (r.photos > 0 ? ' &middot; ' + r.photos + ' photo' + (r.photos === 1 ? '' : 's') + ' sent' : '') +
-    '. Did you want to change it?';
+    '<b style="font-style:normal;color:var(--navy);font-weight:400">' + esc(r.name) + '</b> is down as <b style="font-style:normal;color:var(--navy);font-weight:400">' +
+    (yes ? 'attending' + (r.guests > 1 ? ', party of ' + r.guests : '') : 'not attending') +
+    '</b>. Do you want to change that reply?';
   knownEl.hidden = false;
 }
 function hideKnown(){ knownEl.hidden = true; EXISTING = null; }
 
-/* Amend: fill the form with what they said last time so they change one thing
-   rather than re-entering everything. */
-function loadExisting(){
-  if (!EXISTING) return;
+/* Deliberately does NOT copy the old answer into the form. The guest re-picks
+   from scratch, so an update is always something they actively chose rather
+   than something the page decided for them. */
+function allowChange(){
   AMENDING = true;
-  var yes = EXISTING.attending === 'yes';
-  var radio = document.querySelector('input[name=attending][value=' + (yes ? 'yes' : 'no') + ']');
-  if (radio){ radio.checked = true; }
-  document.getElementById('guestRow').classList.toggle('show', yes);
-  if (yes && EXISTING.guests){
-    var sel = document.getElementById('guests');
-    if ([].some.call(sel.options, function(o){ return o.value === String(EXISTING.guests); })) {
-      sel.value = String(EXISTING.guests);
-    }
-  }
-  var banner = document.getElementById('amending');
-  banner.innerHTML = 'Updating the reply for <b>' + esc(EXISTING.name) + '</b>. ' +
-    'Changing your answer below replaces it &mdash; ' +
-    (EXISTING.photos > 0
-      ? 'any photos you already sent are kept, and new ones are added.'
-      : 'and you can still add photos.');
-  banner.hidden = false;
   knownEl.hidden = true;
+  var banner = document.getElementById('amending');
+  banner.innerHTML = 'Changing the reply for <b>' + esc(EXISTING ? EXISTING.name : '') + '</b>. ' +
+    'Choose your answer below — it replaces the previous one. ' +
+    'Photos already sent are kept, and new ones are added.';
+  banner.hidden = false;
   btn.textContent = 'Update My Reply';
   document.querySelector('.choices').scrollIntoView({ behavior:'smooth', block:'center' });
 }
@@ -691,7 +795,8 @@ form.addEventListener('submit', async function(e){
     type:'rsvp', name:name,
     attending: yes ? 'yes' : 'no',
     guests: yes ? (document.getElementById('guests').value || '1') : '0',
-    photoCount: PHOTOS.length
+    photoCount: PHOTOS.length,
+    toast: document.getElementById('toast').value.trim()
   };
 
   btn.disabled = true; btn.textContent = 'Sending…'; show('', '');
@@ -722,6 +827,7 @@ form.addEventListener('submit', async function(e){
 
 function confirmed(p){
   var yes = p.attending === 'yes';
+  saveReply(p);
   form.style.display = 'none';
   document.getElementById('formHead').style.display = 'none';
 
@@ -735,6 +841,9 @@ function confirmed(p){
            + '<div class="r"><span class="k">Reply</span><span class="v">' + (yes ? 'Joyfully accepts' : 'Regretfully declines') + '</span></div>';
   if(p.photoCount > 0){
     rows += '<div class="r"><span class="k">Photos</span><span class="v">' + p.photoCount + ' received &mdash; thank you</span></div>';
+  }
+  if(p.toast){
+    rows += '<div class="r"><span class="k">Your note</span><span class="v">Received &mdash; thank you</span></div>';
   }
   if(yes){
     rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(p.guests) + '</span></div>'
@@ -782,6 +891,9 @@ function esc(s){
     return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
   });
 }
+
+/* Last: if this browser already replied, swap the form for the summary. */
+try{ showReturning(); }catch(e){}
 </script>
 </body>
 </html>

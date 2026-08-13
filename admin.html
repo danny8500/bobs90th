@@ -93,6 +93,32 @@
   .folderline:empty{display:none}
   .folderline a{color:var(--navy)}
 
+  .acts{white-space:nowrap; text-align:right}
+  .mini{font-family:var(--serif); font-size:11.5px; font-weight:600; letter-spacing:.1em;
+        text-transform:uppercase; color:var(--navy); background:var(--paper);
+        border:1px solid var(--rule); border-radius:2px; padding:6px 10px; cursor:pointer; margin-left:6px}
+  .mini:hover{border-color:var(--gold)}
+  .mini.del{color:var(--red)} .mini.del:hover{border-color:var(--red)}
+
+  /* ---- edit dialog ---- */
+  .ov{position:fixed; inset:0; background:rgba(14,32,56,.55); display:none;
+      align-items:flex-start; justify-content:center; z-index:60; padding:20px; overflow:auto}
+  .ov.show{display:flex}
+  .dlg{background:var(--paper); border:1px solid var(--rule); width:100%; max-width:520px;
+       margin-top:6vh; padding:8px; box-shadow:0 24px 60px rgba(14,32,56,.3)}
+  .dlg-in{border:1px solid var(--rule); padding:26px 26px 22px}
+  .dlg h2{font-size:15px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; margin:0 0 18px}
+  .dlg label{display:block; font-size:11px; letter-spacing:.18em; text-transform:uppercase;
+             color:var(--muted); margin:14px 0 6px}
+  .dlg input[type=text], .dlg select, .dlg textarea{
+    width:100%; font-family:var(--serif); font-size:16px; color:var(--navy);
+    background:var(--cream-2); border:1px solid var(--rule); border-radius:2px; padding:10px 12px; outline:none}
+  .dlg textarea{min-height:86px; resize:vertical; line-height:1.5}
+  .dlg input:focus, .dlg select:focus, .dlg textarea:focus{border-color:var(--gold)}
+  .dlg-btns{display:flex; gap:9px; margin-top:20px}
+  .dlg-btns .btn{flex:1; padding:11px}
+  .dlg-err{color:var(--red); font-size:13.5px; margin-top:10px; min-height:18px}
+
   .empty{text-align:center; padding:44px 20px; color:var(--muted); font-style:italic; background:var(--paper); border:1px solid var(--rule)}
   .err{background:var(--red-bg); color:var(--red); border:1px solid #E0BDBD; padding:13px 16px; margin-bottom:16px; font-size:15px}
   .err:empty{display:none}
@@ -145,6 +171,30 @@
 
   <div id="list"></div>
 </div>
+
+
+<div class="ov" id="editOv"><div class="dlg"><div class="dlg-in">
+  <h2>Edit reply</h2>
+  <label for="eName">Name</label>
+  <input type="text" id="eName">
+  <label for="eAttending">Attending</label>
+  <select id="eAttending">
+    <option value="yes">Attending</option>
+    <option value="no">Declined</option>
+  </select>
+  <label for="eGuests">Party size</label>
+  <select id="eGuests">
+    <option>1</option><option>2</option><option>3</option>
+    <option>4</option><option>5</option><option>6</option>
+  </select>
+  <label for="eToast">Notes</label>
+  <textarea id="eToast"></textarea>
+  <div class="dlg-err" id="eErr"></div>
+  <div class="dlg-btns">
+    <button class="btn" onclick="closeEdit()">Cancel</button>
+    <button class="btn solid" id="eSave" onclick="saveEdit()">Save changes</button>
+  </div>
+</div></div></div>
 
 <script>
 /* Same endpoint as the guest page — paste the Apps Script /exec URL here too. */
@@ -209,7 +259,7 @@ function stats(){
 
   var fl = document.getElementById('folderline');
   fl.innerHTML = FOLDER_URL
-    ? 'All guest photos live in <a href="' + esc(FOLDER_URL) + '" target="_blank" rel="noopener">this Drive folder</a>, one subfolder per guest.'
+    ? 'All guest photos live in <a href="' + esc(FOLDER_URL) + '" target="_blank" rel="noopener">this Drive folder</a>, named for whoever sent them.'
     : '';
 }
 
@@ -241,22 +291,24 @@ function render(){
   el.innerHTML =
     '<table><thead><tr>' +
       '<th>Guest</th><th>Reply</th><th style="text-align:center">Party</th>' +
-      '<th class="note-h" style="text-align:center">Photos</th><th class="when-h">Received</th>' +
+      '<th style="text-align:center">Photos</th><th class="note-h">Notes</th>' +
+      '<th class="when-h">Received</th><th></th>' +
     '</tr></thead><tbody>' +
     rows.map(function(r){
       var yes = r.attending === 'yes';
       var n = parseInt(r.photos, 10) || 0;
-      var photoCell = n
-        ? (r.photoFolder
-            ? '<a class="phl" href="' + esc(r.photoFolder) + '" target="_blank" rel="noopener">' + n + ' &rarr;</a>'
-            : '<span class="num">' + n + '</span>')
-        : '<span style="color:#A9B3C1">&mdash;</span>';
+      var key = encodeURIComponent(r.name);
       return '<tr>' +
         '<td><div class="nm">' + esc(r.name) + '</div></td>' +
         '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' + (yes ? 'Attending' : 'Declined') + '</span></td>' +
         '<td class="num">' + (yes ? esc(r.guests || '1') : '—') + '</td>' +
-        '<td class="note" style="text-align:center">' + photoCell + '</td>' +
+        '<td class="num">' + (n ? n : '<span style="color:#A9B3C1">—</span>') + '</td>' +
+        '<td class="note">' + (r.toast ? esc(r.toast) : '<span style="color:#A9B3C1">—</span>') + '</td>' +
         '<td class="when-col">' + esc(fmt(r.timestamp)) + '</td>' +
+        '<td class="acts">' +
+          '<button class="mini" data-act="edit" data-n="' + key + '">Edit</button>' +
+          '<button class="mini del" data-act="del" data-n="' + key + '">Delete</button>' +
+        '</td>' +
       '</tr>';
     }).join('') +
     '</tbody></table>';
@@ -289,6 +341,111 @@ function exportCsv(){
   a.download = 'bobs-90th-rsvps.csv';
   a.click();
   URL.revokeObjectURL(a.href);
+}
+
+
+/* ---------------------------------------------------------------------------
+ * Editing and deleting
+ * Both go through the same /exec endpoint as everything else, but carry the
+ * admin key in the POST body — the backend refuses them without it. The key
+ * lives only in sessionStorage on this page, never in the deployed HTML.
+ * ------------------------------------------------------------------------- */
+var EDITING = null;
+
+document.getElementById('list').addEventListener('click', function(e){
+  var b = e.target.closest('button[data-act]');
+  if(!b) return;
+  if(b.dataset.act === 'edit') openEdit(b.dataset.n);
+  else doDelete(b.dataset.n);
+});
+
+function rowByName(n){
+  return ROWS.filter(function(r){ return r.name === n; })[0] || null;
+}
+
+function openEdit(encName){
+  var name = decodeURIComponent(encName);
+  var r = rowByName(name);
+  if(!r) return;
+  EDITING = r;
+  document.getElementById('eName').value = r.name;
+  document.getElementById('eAttending').value = r.attending === 'yes' ? 'yes' : 'no';
+  document.getElementById('eGuests').value = String(parseInt(r.guests, 10) || 1);
+  document.getElementById('eToast').value = r.toast || '';
+  document.getElementById('eErr').textContent = '';
+  syncGuestState();
+  document.getElementById('editOv').classList.add('show');
+}
+function closeEdit(){ document.getElementById('editOv').classList.remove('show'); EDITING = null; }
+
+/* Party size is meaningless on a decline — grey it out rather than letting you
+   save "not attending, party of 4". */
+function syncGuestState(){
+  var yes = document.getElementById('eAttending').value === 'yes';
+  var g = document.getElementById('eGuests');
+  g.disabled = !yes;
+  g.style.opacity = yes ? '' : '.45';
+}
+document.getElementById('eAttending').addEventListener('change', syncGuestState);
+document.getElementById('editOv').addEventListener('click', function(e){
+  if(e.target === this) closeEdit();
+});
+document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeEdit(); });
+
+async function adminPost(payload){
+  payload.key = KEY;
+  var r = await fetch(ENDPOINT, {
+    method:'POST',
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  var d = await r.json();
+  if(d && d.error) throw new Error(d.error);
+  return d;
+}
+
+async function saveEdit(){
+  if(!EDITING) return;
+  var btn = document.getElementById('eSave');
+  var err = document.getElementById('eErr');
+  var name = document.getElementById('eName').value.trim();
+  if(!name){ err.textContent = 'A name is required.'; return; }
+
+  var attending = document.getElementById('eAttending').value;
+  btn.disabled = true; btn.textContent = 'Saving...'; err.textContent = '';
+  try{
+    await adminPost({
+      type: 'admin-update',
+      original: EDITING.name,          // match on the OLD name so renames work
+      name: name,
+      attending: attending,
+      guests: attending === 'yes' ? document.getElementById('eGuests').value : '0',
+      toast: document.getElementById('eToast').value.trim()
+    });
+    closeEdit();
+    await load();
+  }catch(e){
+    err.textContent = e.message || 'Could not save that.';
+  }finally{
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
+
+async function doDelete(encName){
+  var name = decodeURIComponent(encName);
+  var r = rowByName(name);
+  var extra = (r && parseInt(r.photos, 10) > 0)
+    ? '\n\nTheir ' + r.photos + ' photo(s) will go to the Drive trash too.'
+    : '';
+  if(!confirm('Delete ' + name + ' from the guest list?' + extra +
+     '\n\nThis cannot be undone from here.')) return;
+  try{
+    var d = await adminPost({ type: 'admin-delete', name: name });
+    await load();
+    if(d && d.trashedPhotos) console.log('trashed ' + d.trashedPhotos + ' photo(s)');
+  }catch(e){
+    document.getElementById('err').textContent = e.message || 'Could not delete that.';
+  }
 }
 
 function esc(s){

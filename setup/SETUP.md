@@ -17,7 +17,7 @@ You open /admin.html  →  Apps Script  →  reads the Sheet  →  the list
 |---|---|
 | **Guest link** | <https://bobs90th.com> — put this behind CLICK TO RSVP |
 | **Your RSVP list** | <https://bobs90th.com/admin.html> |
-| **Admin key** | `bob90-bruin-anchor-2941` |
+| **Admin key** | `oreo` |
 | **Spreadsheet** | [Bob's 90th RSVPs](https://docs.google.com/spreadsheets/d/1HuGBOcoVHWQNzgCX98umGW_d4UBkkMCmYcv7GaFWgRA/edit) |
 | **Photos** | [Bob's 90th — Guest Photos](https://drive.google.com/drive/folders/13iNnfaq5j3TxBaQNCZjtfGo4EljruY9Y) — one subfolder per guest |
 | **Email alerts** | dannylewis@gmail.com, one per RSVP |
