@@ -140,7 +140,9 @@
     background:var(--cream-2); border:1px solid var(--rule); border-radius:2px; padding:10px 12px; outline:none; resize:vertical}
   .inv-add textarea:focus{border-color:var(--gold)}
   .inv-btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
-  .inv-msg{font-size:14px; margin-top:11px; min-height:19px; font-style:italic; color:var(--muted)}
+  .inv-msg{font-size:15px; margin-top:12px; min-height:20px; font-style:italic; color:var(--muted)}
+  .inv-msg.ok{font-size:15.5px}
+  tr.justadded td{background:#F3EBD3 !important; transition:background 1.2s ease}
   .inv-msg.err{color:var(--red); font-style:normal}
   .inv-msg.ok{color:var(--green); font-style:normal}
   .stage{display:inline-block; font-size:11px; font-weight:600; letter-spacing:.09em; text-transform:uppercase;
@@ -539,7 +541,7 @@ async function doDelete(encName){
  * specific invitation, which is how "who has not replied yet" is answerable at
  * all. A forwarded link with no token still works, it just shows as a walk-in.
  * ------------------------------------------------------------------------- */
-var INVITES = [], SITE = '', INV_FILTER = 'all', TAB = 'replies';
+var INVITES = [], SITE = '', INV_FILTER = 'all', TAB = 'replies', NEW_TOKENS = [];
 
 function showTab(t){
   TAB = t;
@@ -571,6 +573,7 @@ function setInvFilter(f, btn){
    chasing, so it counts anyone without a reply whether or not they opened. */
 function invVisible(){
   return INVITES.filter(function(i){
+    if(NEW_TOKENS.indexOf(i.token) >= 0) return true;
     if(INV_FILTER === 'noreply') return !i.replied;
     if(INV_FILTER === 'opened')  return i.opened && !i.replied;
     if(INV_FILTER === 'unsent')  return !i.sent;
@@ -592,16 +595,19 @@ async function addInvites(){
   /* Accept "Name, email", "Name <email>" or "email" alone — people paste all
      three, and rejecting two of them would just be pedantry. */
   var people = [], bad = 0;
-  raw.split(NEWLINE).forEach(function(line){
+  raw.split(/\r?\n/).forEach(function(line){
     line = line.trim();
     if(!line) return;
+    /* A trailing ", 4" is a seat count - peel it off before the email
+       match, which anchors at the end of the line. */
+    var seatTail = line.match(/,\s*(\d{1,2})\s*$/);
+    var explicitSeats = 0;
+    if(seatTail){ explicitSeats = parseInt(seatTail[1], 10); line = line.slice(0, seatTail.index).trim(); }
+
     var m = line.match(/^(.*?)[,;<]?\s*([^\s,;<>]+@[^\s,;<>]+\.[^\s,;<>]+)>?$/);
     if(!m){ bad++; return; }
     var email = m[2].trim();
     var whole = m[1].replace(/[,;<]\s*$/, '').trim() || email.split('@')[0];
-    var seatMatch = whole.match(/^(.*?),\s*(\d+)$/);   // "Name, email, 3" lands here as "Name, 3"
-    var explicitSeats = 0;
-    if(seatMatch){ whole = seatMatch[1].trim(); explicitSeats = parseInt(seatMatch[2], 10); }
     /* "Tom Brady & Elaine Brady" is two people on one invitation. Split so we
        store both names and can pre-fill them, rather than treating the pair as
        a single oddly-punctuated guest. */
@@ -614,11 +620,26 @@ async function addInvites(){
 
   invMsg('Adding ' + people.length + '...');
   try{
+    var before = {};
+    INVITES.forEach(function(i){ before[i.token] = true; });
     var d = await adminPost({ type:'admin-add-invites', people: people });
-    invMsg('Added ' + d.added + (d.updated ? ', updated ' + d.updated : '') +
-           (bad ? ' — ' + bad + ' line(s) had no email and were skipped' : '') + '.', 'ok');
     document.getElementById('invPaste').value = '';
     await load();
+
+    /* Make the result impossible to miss: land on the invitation list with the
+       new rows highlighted, rather than leaving a cleared text box as the only
+       evidence anything happened. */
+    NEW_TOKENS = INVITES.filter(function(i){ return !before[i.token]; }).map(function(i){ return i.token; });
+    showTab('invites');
+    var namesAdded = INVITES.filter(function(i){ return NEW_TOKENS.indexOf(i.token) >= 0; })
+                            .map(function(i){ return i.name; });
+    invMsg('✓ Added ' + (namesAdded.length ? namesAdded.join('; ') : d.updated + ' updated') +
+           ' — now on the list below. Use a Send button when you are ready to email.' +
+           (bad ? ' (' + bad + ' line(s) had no email and were skipped.)' : ''), 'ok');
+    renderInvites();
+    var first = document.querySelector('tr.justadded');
+    if(first) first.scrollIntoView({ behavior:'smooth', block:'center' });
+    setTimeout(function(){ NEW_TOKENS = []; renderInvites(); }, 6000);
   }catch(e){ invMsg(e.message || 'Could not add those.', 'err'); }
 }
 
@@ -677,7 +698,7 @@ function renderInvites(){
     list.map(function(i){
       var stage = i.replied ? ['done','Replied'] : i.opened ? ['open','Opened, no reply'] :
                   i.sent ? ['sent','Emailed'] : ['none','Not emailed'];
-      return '<tr>' +
+      return '<tr' + (NEW_TOKENS.indexOf(i.token) >= 0 ? ' class="justadded"' : '') + '>' +
         '<td><div class="nm">' + esc(i.name) + '</div><div class="lnk">' + esc(SITE + '?i=' + i.token) + '</div></td>' +
         '<td class="num">' + esc(i.seats || 1) + '</td>' +
         '<td class="em">' + esc(i.email) + '</td>' +
