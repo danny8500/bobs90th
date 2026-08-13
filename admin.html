@@ -100,6 +100,7 @@
         border:1px solid var(--rule); border-radius:2px; padding:6px 10px; cursor:pointer; margin-left:6px}
   .mini:hover{border-color:var(--gold)}
   .mini.del{color:var(--red)} .mini.del:hover{border-color:var(--red)}
+  .mini.send{color:var(--green); border-color:rgba(31,107,63,.35)} .mini.send:hover{border-color:var(--green)}
 
   /* ---- edit dialog ---- */
   .ov{position:fixed; inset:0; background:rgba(14,32,56,.55); display:none;
@@ -704,15 +705,36 @@ function renderInvites(){
         '<td class="em">' + esc(i.email) + '</td>' +
         '<td><span class="stage ' + stage[0] + '">' + stage[1] + '</span></td>' +
         '<td class="when-col">' + (i.sent ? esc(fmt(i.sent)) : '—') + '</td>' +
-        '<td class="acts"><button class="mini del" data-inv="' + esc(i.token) + '">Remove</button></td>' +
+        '<td class="acts">' +
+          '<button class="mini send" data-send="' + esc(i.token) + '">' + (i.sent ? 'Resend' : 'Send') + '</button>' +
+          '<button class="mini del" data-inv="' + esc(i.token) + '">Remove</button></td>' +
       '</tr>';
     }).join('') + '</tbody></table>';
 }
 
 document.getElementById('invList').addEventListener('click', function(e){
+  var sb = e.target.closest('button[data-send]');
+  if(sb){ sendToOne(sb.dataset.send, sb); return; }
   var b = e.target.closest('button[data-inv]');
   if(b) delInvite(b.dataset.inv);
 });
+
+/* One person, one email - independent of the bulk buttons. */
+async function sendToOne(token, btn){
+  var i = INVITES.filter(function(x){ return x.token === token; })[0];
+  if(!i) return;
+  if(i.sent && !confirm('Send the invitation to ' + i.name + ' again?')) return;
+  var t = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Sending...';
+  try{
+    var d = await adminPost({ type:'admin-send-one', token: token });
+    invMsg('✓ Invitation sent to ' + i.name + ' (' + (d.to || i.email) + ').', 'ok');
+    await load();
+  }catch(e){
+    invMsg(e.message || 'Could not send.', 'err');
+    btn.disabled = false; btn.textContent = t;
+  }
+}
 
 
 /* ---------------------------------------------------------------------------

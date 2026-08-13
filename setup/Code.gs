@@ -38,6 +38,7 @@ function doPost(e) {
       if (p.type === 'admin-update')      return adminUpdate(p);
       if (p.type === 'admin-add-invites') return addInvites(p);
       if (p.type === 'admin-send')        return sendInvites(p);
+      if (p.type === 'admin-send-one')    return sendOne(p);
       if (p.type === 'admin-del-invite')  return deleteInvite(p);
       return json({ error: 'Unknown admin action.' });
     }
@@ -251,7 +252,12 @@ function sendInvites(p) {
   var sent = 0, skipped = 0, failed = 0, quota = 0;
 
   try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { quota = 0; }
+
+  /* The artwork IS the invitation. If it cannot be fetched, refuse to send
+     rather than quietly mailing an artless fallback - that is how a broken
+     certificate once sent a test invitation with no picture on it. */
   var art = inviteImage();
+  if (!art) return json({ error: 'Could not load the invitation artwork from the site - nothing was sent. Try again in a minute.' });
 
   for (var i = 1; i < data.length; i++) {
     var token = data[i][0], nm = data[i][1], em = data[i][2];
@@ -281,6 +287,35 @@ function sendInvites(p) {
   return json({ ok: true, sent: sent, skipped: skipped, failed: failed, quotaLeft: Math.max(0, quota - sent) });
 }
 
+/**
+ * Send to exactly one person, by token - for chasing a single guest without
+ * touching everyone else on the list. Resending simply refreshes the Sent stamp.
+ */
+function sendOne(p) {
+  var row = findInvite(p.token);
+  if (row < 0) return json({ error: 'Could not find that invitation.' });
+
+  var art = inviteImage();
+  if (!art) return json({ error: 'Could not load the invitation artwork from the site - nothing was sent. Try again in a minute.' });
+
+  var iv = invitesSheet().getRange(row, 1, 1, IHEADERS.length).getValues()[0];
+  var em = iv[2];
+  if (!em) return json({ error: 'That invitation has no email address.' });
+
+  var link = SITE_URL + '?i=' + encodeURIComponent(iv[0]);
+  var first = String(iv[1]).split(',')[0].split(/\s+/)[0];
+  MailApp.sendEmail({
+    to: em,
+    subject: "You're invited - Bob's 90th Birthday",
+    htmlBody: inviteHtml(first, link, true),
+    body: inviteText(first, link),
+    name: "Bob's 90th Birthday",
+    inlineImages: { invite: art }
+  });
+  invitesSheet().getRange(row, 5).setValue(new Date());
+  return json({ ok: true, sent: 1, to: em });
+}
+
 function deleteInvite(p) {
   var row = findInvite(p.token);
   if (row < 0) return json({ error: 'Could not find that invitation.' });
@@ -291,25 +326,13 @@ function deleteInvite(p) {
 // ============================== EMAIL ======================================
 
 function inviteText(first, link) {
-  return 'Dear ' + first + ',' + '
-
-' +
-    'Please join us in celebrating Bob's 90th Birthday.' + '
-
-' +
-    'Saturday, October 17, 2026' + '
-' +
-    'Virginia Country Club, Long Beach' + '
-' +
-    'Cocktails 5:00 PM - Dinner 6:30 PM' + '
-' +
-    'Cocktail attire' + '
-
-' +
-    'Kindly reply by October 1st:' + '
-' + link + '
-
-' +
+  return 'Dear ' + first + ',' + '\n\n' +
+    'Please join us in celebrating Bob\'s 90th Birthday.' + '\n\n' +
+    'Saturday, October 17, 2026' + '\n' +
+    'Virginia Country Club, Long Beach' + '\n' +
+    'Cocktails 5:00 PM - Dinner 6:30 PM' + '\n' +
+    'Cocktail attire' + '\n\n' +
+    'Kindly reply by October 1st:' + '\n' + link + '\n\n' +
     'Ninety years well played.';
 }
 
@@ -320,16 +343,30 @@ function inviteText(first, link) {
  * invitation that arrives as an empty box is worse than no image at all.
  * Cached in script properties so 100 emails do not mean 100 downloads.
  */
+/**
+ * Fetch the invitation artwork from the live site.
+ *
+ * Two bugs were paid for here, so both checks stay:
+ *   1. It once trusted muteHttpExceptions and cached whatever came back, so with a
+ *      broken certificate it stored a 404 page as "the artwork" and mailed that.
+ *      Hence the status check and the JPEG magic-number check.
+ *   2. It cached the base64 in CacheService - but that caps a value at 100KB and the
+ *      artwork is ~148KB encoded, so put() threw and the whole thing fell into the
+ *      catch and returned null. No cache now: one fetch per send batch is cheap.
+ */
 function inviteImage() {
   try {
-    var cache = CacheService.getScriptCache();
-    var b64 = cache.get('invite_img');
-    if (!b64) {
-      var blob = UrlFetchApp.fetch(SITE_URL + 'images/invitation.jpg', { muteHttpExceptions: true }).getBlob();
-      b64 = Utilities.base64Encode(blob.getBytes());
-      cache.put('invite_img', b64, 21600);   // six hours
-    }
-    return Utilities.newBlob(Utilities.base64Decode(b64), 'image/jpeg', 'invitation.jpg');
+    var res = UrlFetchApp.fetch(SITE_URL + 'images/invitation.jpg', {
+      muteHttpExceptions: true,
+      followRedirects: true
+    });
+    if (res.getResponseCode() !== 200) return null;
+
+    var bytes = res.getBlob().getBytes();
+    if (!bytes || bytes.length < 10000) return null;        // an error page is tiny
+    if (bytes[0] !== -1 || bytes[1] !== -40) return null;   // JPEG magic FF D8
+
+    return Utilities.newBlob(bytes, 'image/jpeg', 'invitation.jpg');
   } catch (err) {
     return null;
   }
