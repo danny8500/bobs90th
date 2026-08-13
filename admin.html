@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RSVP List — Bob's 90th</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  /* Same palette as the guest page, but this is a working view: denser type,
+     smaller controls, everything visible without a click. */
+  :root{
+    --navy:#1B3A63; --navy-deep:#14294a; --gold:#B08D3F;
+    --cream:#F7F1E1; --cream-2:#FBF7EC; --paper:#FFFDF7;
+    --rule:rgba(27,58,99,.2); --muted:#6B7B92;
+    --green:#1F6B3F; --green-bg:#E4F0E6; --red:#9B2C2C; --red-bg:#F5E4E4;
+    --serif:'Cormorant Garamond', Georgia, serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--cream); color:var(--navy); font-family:var(--serif); font-size:16px; -webkit-font-smoothing:antialiased}
+  /* Cormorant defaults to old-style figures, which drop "1" below the cap line so
+     it reads as a capital I — fine in body copy, wrong for a headcount. Force
+     lining, tabular figures anywhere a number is the content. */
+  .stat .n, .num, .when-col, .seg, .when{font-variant-numeric:lining-nums tabular-nums; font-feature-settings:"lnum" 1,"tnum" 1}
+  .wrap{max-width:960px; margin:0 auto; padding:26px 20px 70px}
+  @media(max-width:560px){ .wrap{padding:18px 13px 50px} }
+
+  .top{display:flex; align-items:flex-end; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:4px}
+  h1{font-size:27px; font-weight:600; letter-spacing:.11em; text-transform:uppercase; margin:0}
+  .when{font-size:13.5px; color:var(--muted); font-style:italic; margin:2px 0 20px}
+
+  .btn{font-family:var(--serif); font-size:13px; font-weight:600; letter-spacing:.13em; text-transform:uppercase;
+       color:var(--navy); background:var(--paper); border:1px solid var(--rule); border-radius:2px;
+       padding:9px 15px; cursor:pointer; transition:border-color .14s, background .14s}
+  .btn:hover{border-color:var(--gold); background:var(--cream-2)}
+  .btn.solid{background:var(--navy); color:var(--cream); border-color:var(--navy)}
+  .btn.solid:hover{background:var(--navy-deep); color:var(--cream)}
+  .tools{display:flex; gap:8px; flex-wrap:wrap}
+
+  /* ---- gate ---- */
+  #gate{max-width:400px; margin:70px auto; background:var(--paper); border:1px solid var(--rule); padding:8px}
+  #gate .in{border:1px solid var(--rule); padding:28px 26px}
+  #gate h2{font-size:19px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; margin:0 0 6px; text-align:center}
+  #gate p{font-size:14.5px; color:var(--muted); font-style:italic; text-align:center; margin:0 0 18px}
+  input[type=password], input[type=search]{
+    width:100%; font-family:var(--serif); font-size:16px; color:var(--navy); background:var(--cream-2);
+    border:1px solid var(--rule); border-radius:2px; padding:11px 13px; outline:none}
+  input:focus{border-color:var(--gold); background:var(--paper); box-shadow:0 0 0 3px rgba(176,141,63,.15)}
+  #gate .btn{width:100%; margin-top:12px; padding:12px}
+  #gateErr{color:var(--red); font-size:14px; text-align:center; margin-top:10px; min-height:19px}
+
+  /* ---- headline counts ---- */
+  .stats{display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:20px}
+  @media(max-width:620px){ .stats{grid-template-columns:repeat(2,1fr)} }
+  .stat{background:var(--paper); border:1px solid var(--rule); padding:15px 16px}
+  .stat .n{font-size:31px; font-weight:600; line-height:1}
+  .stat .l{font-size:11px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); margin-top:5px}
+  .stat.attend .n{color:var(--green)} .stat.declined .n{color:var(--red)}
+
+  .bar{display:flex; gap:10px; align-items:center; margin-bottom:14px; flex-wrap:wrap}
+  .bar input[type=search]{flex:1; min-width:180px}
+  .seg{display:inline-flex; border:1px solid var(--rule); background:var(--paper)}
+  .seg button{border:0; background:none; font-family:var(--serif); font-size:13px; font-weight:600;
+              letter-spacing:.1em; text-transform:uppercase; color:var(--muted); padding:9px 14px; cursor:pointer}
+  .seg button + button{border-left:1px solid var(--rule)}
+  .seg button.on{background:var(--navy); color:var(--cream)}
+
+  /* ---- list ---- */
+  table{width:100%; border-collapse:collapse; background:var(--paper); border:1px solid var(--rule)}
+  th{font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--muted); font-weight:600;
+     text-align:left; padding:11px 14px; border-bottom:1px solid var(--rule); white-space:nowrap}
+  td{padding:12px 14px; border-bottom:1px solid var(--rule); vertical-align:top; font-size:16px}
+  tr:last-child td{border-bottom:0}
+  tr:hover td{background:var(--cream-2)}
+  .nm{font-weight:600}
+  .em{font-size:13.5px; color:var(--muted); word-break:break-all}
+  .pill{display:inline-block; font-size:11.5px; font-weight:600; letter-spacing:.09em; text-transform:uppercase;
+        padding:3px 10px; border-radius:999px; white-space:nowrap}
+  .pill.yes{background:var(--green-bg); color:var(--green)}
+  .pill.no{background:var(--red-bg); color:var(--red)}
+  .num{text-align:center; font-weight:600}
+  .note{font-size:14.5px; font-style:italic; color:#3C4E66; max-width:290px; line-height:1.45}
+  .when-col{font-size:13px; color:var(--muted); white-space:nowrap}
+  @media(max-width:760px){ .note, .when-col, th.note-h, th.when-h{display:none} }
+
+  .phl{font-weight:600; color:var(--navy); text-decoration:none; border-bottom:1px solid var(--gold);
+       font-variant-numeric:lining-nums}
+  .phl:hover{color:var(--gold)}
+  .folderline{font-size:14px; color:var(--muted); font-style:italic; margin:-8px 0 18px}
+  .folderline:empty{display:none}
+  .folderline a{color:var(--navy)}
+
+  .empty{text-align:center; padding:44px 20px; color:var(--muted); font-style:italic; background:var(--paper); border:1px solid var(--rule)}
+  .err{background:var(--red-bg); color:var(--red); border:1px solid #E0BDBD; padding:13px 16px; margin-bottom:16px; font-size:15px}
+  .err:empty{display:none}
+</style>
+</head>
+<body>
+
+<!-- Not security — the Apps Script key is what actually guards the data. This
+     just keeps the list from being readable by anyone who guesses /admin. -->
+<div id="gate"><div class="in">
+  <h2>RSVP List</h2>
+  <p>Enter the admin key</p>
+  <input type="password" id="key" placeholder="Admin key" autocomplete="current-password">
+  <button class="btn solid" onclick="unlock()">View Replies</button>
+  <div id="gateErr"></div>
+</div></div>
+
+<div class="wrap" id="app" style="display:none">
+  <div class="top">
+    <div>
+      <h1>Bob's 90th &middot; Replies</h1>
+      <div class="when" id="lastSync">Loading&hellip;</div>
+    </div>
+    <div class="tools">
+      <button class="btn" onclick="load()">Refresh</button>
+      <button class="btn" onclick="exportCsv()">Export CSV</button>
+      <button class="btn" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="err" id="err"></div>
+
+  <div class="stats">
+    <div class="stat attend"><div class="n" id="sAttending">&mdash;</div><div class="l">Guests attending</div></div>
+    <div class="stat"><div class="n" id="sYes">&mdash;</div><div class="l">Accepted</div></div>
+    <div class="stat declined"><div class="n" id="sNo">&mdash;</div><div class="l">Declined</div></div>
+    <div class="stat"><div class="n" id="sPhotos">&mdash;</div><div class="l">Photos sent in</div></div>
+  </div>
+  <div class="folderline" id="folderline"></div>
+
+  <div class="bar">
+    <div class="seg" id="seg">
+      <button class="on" data-f="all"  onclick="setFilter('all',this)">All</button>
+      <button          data-f="yes"  onclick="setFilter('yes',this)">Attending</button>
+      <button          data-f="no"   onclick="setFilter('no',this)">Declined</button>
+      <button          data-f="note" onclick="setFilter('note',this)">With photos</button>
+    </div>
+    <input type="search" id="q" placeholder="Search name or email&hellip;" oninput="render()">
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<script>
+/* Same endpoint as the guest page — paste the Apps Script /exec URL here too. */
+var ENDPOINT = "PASTE_YOUR_APPS_SCRIPT_URL_HERE";
+
+var ROWS = [], FILTER = 'all', KEY = '', FOLDER_URL = '';
+
+/* The key lives in sessionStorage, not localStorage: closing the tab signs you
+   out, which is the right default for a page that lists other people's emails. */
+(function(){
+  var saved = sessionStorage.getItem('bob90key');
+  if(saved){ KEY = saved; openApp(); }
+})();
+
+function unlock(){
+  var k = document.getElementById('key').value.trim();
+  if(!k){ document.getElementById('gateErr').textContent = 'Enter the key.'; return; }
+  KEY = k; sessionStorage.setItem('bob90key', k); openApp();
+}
+document.getElementById('key').addEventListener('keydown', function(e){ if(e.key === 'Enter') unlock(); });
+
+function openApp(){
+  document.getElementById('gate').style.display = 'none';
+  document.getElementById('app').style.display = '';
+  load();
+}
+function signOut(){ sessionStorage.removeItem('bob90key'); location.reload(); }
+
+async function load(){
+  var err = document.getElementById('err'); err.textContent = '';
+  document.getElementById('lastSync').textContent = 'Loading…';
+  try{
+    if(ENDPOINT.indexOf('PASTE_') === 0) throw new Error('This page is not connected yet — see SETUP.md.');
+    var r = await fetch(ENDPOINT + '?key=' + encodeURIComponent(KEY));
+    var d = await r.json();
+    if(d.error){
+      if(/key/i.test(d.error)){ sessionStorage.removeItem('bob90key'); }
+      throw new Error(d.error);
+    }
+    ROWS = d.rows || [];
+    FOLDER_URL = d.folderUrl || '';
+    document.getElementById('lastSync').textContent =
+      'Updated ' + new Date().toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'}) +
+      ' · ' + ROWS.length + ' repl' + (ROWS.length === 1 ? 'y' : 'ies');
+    stats(); render();
+  }catch(e){
+    err.textContent = e.message || 'Could not load the replies.';
+    document.getElementById('lastSync').textContent = 'Not loaded';
+  }
+}
+
+/* "Guests attending" is the number the country club needs — the sum of party
+   sizes, not the number of replies. Those are different and it matters. */
+function stats(){
+  var yes = ROWS.filter(function(r){ return r.attending === 'yes'; });
+  var heads = yes.reduce(function(n,r){ return n + (parseInt(r.guests,10) || 1); }, 0);
+  var pics  = ROWS.reduce(function(n,r){ return n + (parseInt(r.photos,10) || 0); }, 0);
+  document.getElementById('sAttending').textContent = heads;
+  document.getElementById('sYes').textContent = yes.length;
+  document.getElementById('sNo').textContent = ROWS.length - yes.length;
+  document.getElementById('sPhotos').textContent = pics;
+
+  var fl = document.getElementById('folderline');
+  fl.innerHTML = FOLDER_URL
+    ? 'All guest photos live in <a href="' + esc(FOLDER_URL) + '" target="_blank" rel="noopener">this Drive folder</a>, one subfolder per guest.'
+    : '';
+}
+
+function setFilter(f, btn){
+  FILTER = f;
+  document.querySelectorAll('#seg button').forEach(function(b){ b.classList.toggle('on', b === btn); });
+  render();
+}
+
+function visible(){
+  var q = (document.getElementById('q').value || '').toLowerCase().trim();
+  return ROWS.filter(function(r){
+    if(FILTER === 'yes'  && r.attending !== 'yes') return false;
+    if(FILTER === 'no'   && r.attending !== 'no')  return false;
+    if(FILTER === 'note' && !(parseInt(r.photos, 10) || 0)) return false;
+    if(q && (r.name + ' ' + r.email).toLowerCase().indexOf(q) < 0) return false;
+    return true;
+  });
+}
+
+function render(){
+  var rows = visible(), el = document.getElementById('list');
+  if(!rows.length){
+    el.innerHTML = '<div class="empty">' +
+      (ROWS.length ? 'No replies match that filter.' : 'No replies yet. They will appear here as guests respond.') +
+      '</div>';
+    return;
+  }
+  el.innerHTML =
+    '<table><thead><tr>' +
+      '<th>Guest</th><th>Reply</th><th style="text-align:center">Party</th>' +
+      '<th class="note-h" style="text-align:center">Photos</th><th class="when-h">Received</th>' +
+    '</tr></thead><tbody>' +
+    rows.map(function(r){
+      var yes = r.attending === 'yes';
+      var n = parseInt(r.photos, 10) || 0;
+      var photoCell = n
+        ? (r.photoFolder
+            ? '<a class="phl" href="' + esc(r.photoFolder) + '" target="_blank" rel="noopener">' + n + ' &rarr;</a>'
+            : '<span class="num">' + n + '</span>')
+        : '<span style="color:#A9B3C1">&mdash;</span>';
+      return '<tr>' +
+        '<td><div class="nm">' + esc(r.name) + '</div><div class="em">' + esc(r.email) + '</div></td>' +
+        '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' + (yes ? 'Attending' : 'Declined') + '</span></td>' +
+        '<td class="num">' + (yes ? esc(r.guests || '1') : '—') + '</td>' +
+        '<td class="note" style="text-align:center">' + photoCell + '</td>' +
+        '<td class="when-col">' + esc(fmt(r.timestamp)) + '</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>';
+}
+
+function fmt(ts){
+  if(!ts) return '';
+  var d = new Date(ts);
+  return isNaN(d) ? String(ts) : d.toLocaleDateString(undefined,{month:'short',day:'numeric'}) +
+    ', ' + d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+}
+
+/* Export what you are LOOKING at, not the whole table — if you filtered to
+   attending guests, that is the list you want to hand the country club. */
+function exportCsv(){
+  var rows = visible();
+  if(!rows.length){ alert('Nothing to export.'); return; }
+  var head = ['Name','Email','Attending','Party size','Photos','Photo folder','Received'];
+  var body = rows.map(function(r){
+    return [r.name, r.email, r.attending === 'yes' ? 'Yes' : 'No',
+            r.attending === 'yes' ? (r.guests || '1') : '0',
+            parseInt(r.photos, 10) || 0, r.photoFolder || '', fmt(r.timestamp)];
+  });
+  var csv = [head].concat(body).map(function(cols){
+    return cols.map(function(c){ return '"' + String(c == null ? '' : c).replace(/"/g,'""') + '"'; }).join(',');
+  }).join('\r\n');
+
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'bobs-90th-rsvps.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function esc(s){
+  return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){
+    return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+  });
+}
+</script>
+</body>
+</html>
