@@ -195,6 +195,33 @@
   .choice input:checked + span{background:var(--navy); border-color:var(--navy); color:var(--cream)}
   .choice input:checked + span .small{color:rgba(246,241,227,.72)}
 
+  /* ---- "you've already replied" ---- */
+  .known{
+    margin-top:12px; padding:16px 18px; background:var(--paper);
+    border:1px solid var(--gold-dim); border-left:3px solid var(--gold);
+    animation:slidein .3s ease;
+  }
+  .known[hidden]{display:none}
+  .known-t{font-family:var(--display); font-size:19px; color:var(--navy); line-height:1.3}
+  .known-s{font-size:15px; font-style:italic; color:var(--muted); margin-top:5px; line-height:1.5}
+  .known-btns{display:flex; gap:10px; flex-wrap:wrap; margin-top:14px}
+  .known button{
+    font-family:var(--serif); font-size:12.5px; font-weight:400; letter-spacing:.16em;
+    text-transform:uppercase; text-indent:.16em; padding:11px 16px; cursor:pointer;
+    border:1px solid var(--navy); background:var(--navy); color:var(--cream); transition:background .15s;
+  }
+  .known button:hover{background:var(--navy-deep)}
+  .known .known-n{background:transparent; color:var(--navy); border-color:var(--rule)}
+  .known .known-n:hover{background:transparent; border-color:var(--navy)}
+  /* the banner that stays put once they choose to amend */
+  .amending{
+    margin-bottom:22px; padding:13px 16px; background:var(--paper);
+    border:1px solid var(--gold-dim); border-left:3px solid var(--gold);
+    font-size:14.5px; font-style:italic; color:var(--muted);
+  }
+  .amending[hidden]{display:none}
+  .amending b{font-style:normal; color:var(--navy); font-weight:400}
+
   #guestRow{display:none}
   #guestRow.show{display:block; animation:slidein .3s ease}
   @keyframes slidein{from{opacity:0; transform:translateY(-5px)}to{opacity:1; transform:none}}
@@ -335,10 +362,20 @@
     <span><a href="https://maps.google.com/?q=500+Virginia+Country+Club+Road,+Long+Beach,+CA+90807" target="_blank" rel="noopener">Virginia Country Club, Long Beach</a></span>
   </div>
 
+  <div class="amending" id="amending" hidden></div>
+
   <form id="rsvpForm" novalidate>
     <div class="field">
       <label class="lab" for="name">Name</label>
       <input type="text" id="name" name="name" placeholder="First and last name" autocomplete="name" required>
+      <div class="known" id="known" hidden>
+        <div class="known-t" id="knownT"></div>
+        <div class="known-s" id="knownS"></div>
+        <div class="known-btns">
+          <button type="button" class="known-y" onclick="loadExisting()">Yes, change my reply</button>
+          <button type="button" class="known-n" onclick="dismissKnown()">No, that&rsquo;s someone else</button>
+        </div>
+      </div>
     </div>
 
     <div class="field">
@@ -426,6 +463,99 @@ document.querySelectorAll('input[name=attending]').forEach(function(r){
 });
 
 function show(kind, text){ msg.className = 'msg ' + kind; msg.textContent = text; }
+
+/* ---------------------------------------------------------------------------
+ * "Haven't you already replied?"
+ * The backend keys on name, so a second reply from the same person overwrites
+ * the first. That is the behaviour we want — but silently is the wrong way to
+ * do it. When a typed name matches an existing row we say so, show what they
+ * previously said, and let them either amend it or declare themselves a
+ * different person with the same name.
+ * ------------------------------------------------------------------------- */
+var EXISTING = null, AMENDING = false;
+var nameEl = document.getElementById('name');
+var knownEl = document.getElementById('known');
+
+var lookupTimer = null, lastLooked = '';
+nameEl.addEventListener('blur', function(){ maybeLookup(); });
+nameEl.addEventListener('input', function(){
+  /* If they edit the name after being warned, the warning no longer applies. */
+  clearTimeout(lookupTimer);
+  if (!AMENDING) hideKnown();
+  lookupTimer = setTimeout(maybeLookup, 900);
+});
+
+async function maybeLookup(){
+  var n = nameEl.value.trim();
+  if (AMENDING) return;                                  // already decided
+  if (n.split(/\s+/).length < 2) return;                 // wait for a full name
+  if (n.toLowerCase() === lastLooked) return;            // don't re-ask the same thing
+  if (ENDPOINT.indexOf('PASTE_') === 0) return;
+  lastLooked = n.toLowerCase();
+  try{
+    var d = await fetch(ENDPOINT + '?lookup=' + encodeURIComponent(n)).then(function(r){ return r.json(); });
+    if (d && d.found && nameEl.value.trim().toLowerCase() === lastLooked) showKnown(d.rsvp);
+  }catch(e){ /* a failed lookup must never block a fresh RSVP */ }
+}
+
+function showKnown(r){
+  EXISTING = r;
+  var yes = r.attending === 'yes';
+  var when = '';
+  try{
+    var d = new Date(r.when);
+    if (!isNaN(d)) when = ' on ' + d.toLocaleDateString(undefined, { month:'long', day:'numeric' });
+  }catch(e){}
+
+  document.getElementById('knownT').textContent = 'It looks like you have already replied.';
+  document.getElementById('knownS').innerHTML =
+    esc(r.name) + ' replied' + when + ': <b style="font-style:normal;color:var(--navy);font-weight:400">' +
+    (yes ? 'joyfully accepts' + (r.guests > 1 ? ', party of ' + r.guests : '') : 'regretfully declines') +
+    '</b>' + (r.photos > 0 ? ' &middot; ' + r.photos + ' photo' + (r.photos === 1 ? '' : 's') + ' sent' : '') +
+    '. Did you want to change it?';
+  knownEl.hidden = false;
+}
+function hideKnown(){ knownEl.hidden = true; EXISTING = null; }
+
+/* Amend: fill the form with what they said last time so they change one thing
+   rather than re-entering everything. */
+function loadExisting(){
+  if (!EXISTING) return;
+  AMENDING = true;
+  var yes = EXISTING.attending === 'yes';
+  var radio = document.querySelector('input[name=attending][value=' + (yes ? 'yes' : 'no') + ']');
+  if (radio){ radio.checked = true; }
+  document.getElementById('guestRow').classList.toggle('show', yes);
+  if (yes && EXISTING.guests){
+    var sel = document.getElementById('guests');
+    if ([].some.call(sel.options, function(o){ return o.value === String(EXISTING.guests); })) {
+      sel.value = String(EXISTING.guests);
+    }
+  }
+  var banner = document.getElementById('amending');
+  banner.innerHTML = 'Updating the reply for <b>' + esc(EXISTING.name) + '</b>. ' +
+    'Changing your answer below replaces it &mdash; ' +
+    (EXISTING.photos > 0
+      ? 'any photos you already sent are kept, and new ones are added.'
+      : 'and you can still add photos.');
+  banner.hidden = false;
+  knownEl.hidden = true;
+  btn.textContent = 'Update My Reply';
+  document.querySelector('.choices').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+/* Two guests can genuinely share a name. Saying so keeps their reply separate
+   in the guest's mind — the Sheet still merges them, which is a limit of having
+   no email, so the banner tells them to add a middle initial. */
+function dismissKnown(){
+  knownEl.hidden = true;
+  AMENDING = false;
+  var banner = document.getElementById('amending');
+  banner.innerHTML = 'Two guests with the same name will share one line on our list &mdash; ' +
+    'please add a middle initial or maiden name so we can tell you apart.';
+  banner.hidden = false;
+  nameEl.focus();
+}
 
 /* ---------------------------------------------------------------------------
  * Photos
@@ -623,6 +753,11 @@ function restart(e){
   form.style.display = '';
   document.getElementById('formHead').style.display = '';
   btn.disabled = false; btn.textContent = 'Send Reply'; show('','');
+  /* Coming back to change a just-sent reply IS the amend case, so let the
+     lookup run again rather than carrying stale state. */
+  AMENDING = false; lastLooked = ''; hideKnown();
+  document.getElementById('amending').hidden = true;
+  document.getElementById('prog').classList.remove('show');
   document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
 }
 

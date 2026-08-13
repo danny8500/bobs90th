@@ -124,9 +124,36 @@ function findRowByName(sheet, name) {
 }
 function norm(s) { return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
 
-/** Admin page reads here: /exec?key=... */
+/**
+ * Admin page reads here: /exec?key=...
+ * The guest page also calls /exec?lookup=<name> to ask "have I already replied?".
+ * That one is deliberately unauthenticated — it has to work for a guest who has
+ * no key — so it returns ONLY that person's own reply, on an exact full-name
+ * match, and never a list. Someone who already knows a guest's full name learns
+ * whether that guest is coming; that is the whole exposure, and for a family
+ * party it is worth the guest not silently clobbering their own RSVP.
+ */
 function doGet(e) {
-  var key = e && e.parameter ? e.parameter.key : '';
+  var p = (e && e.parameter) ? e.parameter : {};
+
+  if (p.lookup) {
+    var sheet = getSheet();
+    var row = findRowByName(sheet, p.lookup);
+    if (row < 0) return json({ found: false });
+    var v = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
+    return json({
+      found: true,
+      rsvp: {
+        name:      v[1],
+        attending: v[2],
+        guests:    v[3],
+        photos:    v[4],
+        when:      v[0] ? new Date(v[0]).toISOString() : ''
+      }
+    });
+  }
+
+  var key = p.key || '';
   if (key !== ADMIN_KEY) return json({ error: 'Invalid admin key.' });
 
   var data = getSheet().getDataRange().getValues();
