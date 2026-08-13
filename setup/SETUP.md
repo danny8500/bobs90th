@@ -19,8 +19,8 @@ You open /admin.html  →  Apps Script  →  reads the Sheet  →  the list
 | **Your RSVP list** | <https://bobs90th.com/admin.html> |
 | **Admin key** | `oreo` |
 | **Spreadsheet** | [Bob's 90th RSVPs](https://docs.google.com/spreadsheets/d/1HuGBOcoVHWQNzgCX98umGW_d4UBkkMCmYcv7GaFWgRA/edit) |
-| **Photos** | [Bob's 90th — Guest Photos](https://drive.google.com/drive/folders/13iNnfaq5j3TxBaQNCZjtfGo4EljruY9Y) — one subfolder per guest |
-| **Email alerts** | dannylewis@gmail.com, one per RSVP |
+| **Photos** | [Bob's 90th — Guest Photos](https://drive.google.com/drive/folders/13iNnfaq5j3TxBaQNCZjtfGo4EljruY9Y) — every guest's photos in this one folder |
+| **Email alerts** | Off. No mail is sent to you per RSVP (it would eat the daily quota) |
 | **Site source** | <https://github.com/danny8500/bobs90th> |
 | **Backend code** | [Apps Script project](https://script.google.com/home/projects/1LpajfZr2K9FkupXgUJHM_XhlweNLjRH3NZzjYcjJmD2odcIwFYOMG1Tf/edit) |
 
@@ -63,7 +63,37 @@ GitHub Pages redeploys in about a minute.
 
 Edit `Code.gs`, paste it into the Apps Script editor, save — **then**
 **Deploy ▸ Manage deployments ▸ ✏️ ▸ Version: New version ▸ Deploy**.
-Saving alone does *not* update the live URL. Currently on Version 2.
+Saving alone does *not* update the live URL. Currently on Version 8.
+
+**To test a change without deploying**, use the head URL, which always runs the
+last *saved* code:
+
+```
+https://script.google.com/macros/s/AKfycbwxA86qp90Og4ZZ2zVfn1q6DTtMZOPqaGE4YEwX09Zg/dev
+```
+
+Save in the editor, hit that URL, see the result. Deploy only once it works.
+The guest site and admin page always talk to the deployed `/exec` URL.
+
+## Inviting people
+
+The admin page's second tab is the invitation list. Paste names (`Name, email`,
+one per line — join couples with `&` and both names are saved) or import a CSV,
+press **Add to list**, then send:
+
+- **Send to everyone not yet emailed** — the bulk send
+- **Remind those who haven't replied** — chases the outstanding ones
+- **Send / Resend** on any row — one person only, for when you just need to
+  chase or re-send to a single guest
+
+Each invitation carries its own link (`bobs90th.com/?i=TOKEN`), which is how the
+list knows who opened it and who replied, and how a couple's names arrive
+pre-filled so they don't retype them.
+
+The email *is* the invitation artwork — the whole picture is the RSVP link. The
+script fetches it from `bobs90th.com/images/invitation.jpg` at send time, so
+replacing that file changes what gets mailed. If it can't be fetched, the send
+is refused with an error rather than mailing a picture-less invitation.
 
 ## Things worth knowing
 
@@ -89,4 +119,6 @@ Saving alone does *not* update the live URL. Currently on Version 2.
 | Form says "not connected yet" | `ENDPOINT` in index.html lost its URL |
 | Admin says "Invalid admin key" | Key doesn't match `ADMIN_KEY` in Code.gs |
 | Backend edits do nothing | Saved but didn't **Deploy ▸ New version** |
+| "Could not load the invitation artwork" | The site or that image is unreachable — check <https://bobs90th.com/images/invitation.jpg> loads |
+| "You do not have permission to call UrlFetchApp" | The script lost the external-request scope; open the editor, Run any function and approve |
 | HTTPS warning | Certificate reissuing; http still works |
