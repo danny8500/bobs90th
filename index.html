@@ -65,7 +65,22 @@
       radial-gradient(70% 50% at 50% 108%, rgba(27,58,99,.10), transparent 72%),
       var(--cream);
   }
-  .hero .eyebrow{color:var(--navy-soft); margin:26px 0 30px}
+  /* ---- crest ---- */
+  .crest{display:flex; flex-direction:column; align-items:center; margin-bottom:34px}
+  .crest svg{width:96px; height:80px}
+  .est{display:flex; align-items:center; justify-content:center; margin-top:-2px}
+  .est span{font-family:var(--serif); font-size:13.5px; font-weight:600; letter-spacing:.22em; color:var(--navy)}
+  /* EST. and the year flank the pennant's staff; the gap between them is where
+     the stem lands visually. */
+  .est span:first-of-type{margin-right:48px}
+  .est i{display:block; height:1px; width:52px; background:var(--gold); margin:0 15px; opacity:.85}
+  @media(max-width:460px){ .est i{width:30px; margin:0 10px} .est span:first-of-type{margin-right:32px} }
+
+  .hero .eyebrow{color:var(--navy-soft); margin:0 0 30px}
+  .timesline{
+    margin:14px 0 0; font-family:var(--serif); font-weight:600; font-size:13.5px;
+    letter-spacing:.24em; text-transform:uppercase; text-indent:.24em; color:var(--gold);
+  }
   .hero h1{
     font-family:var(--display); font-weight:500; color:var(--navy);
     font-size:clamp(64px,14vw,168px); line-height:.98; letter-spacing:-.01em; margin:0;
@@ -135,6 +150,17 @@
     display:inline-block; margin-top:20px; font-size:13.5px; font-weight:600; font-style:normal;
     letter-spacing:.22em; text-transform:uppercase; text-indent:.22em; color:var(--gold);
   }
+
+  .recap{
+    display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:6px 14px;
+    border-top:1px solid var(--rule); border-bottom:1px solid var(--rule);
+    padding:15px 8px; margin:0 0 44px; text-align:center;
+    font-size:13.5px; font-weight:600; letter-spacing:.13em; text-transform:uppercase; color:var(--navy);
+  }
+  .recap .rsep{color:var(--gold)}
+  .recap a{color:var(--navy); text-decoration:none; border-bottom:1px solid var(--gold-dim); padding-bottom:1px}
+  .recap a:hover{border-color:var(--gold)}
+  @media(max-width:640px){ .recap{flex-direction:column; gap:7px} .recap .rsep{display:none} }
 
   .field{margin-bottom:24px}
   label.lab{display:block; font-size:12.5px; letter-spacing:.22em; text-transform:uppercase; font-weight:600; color:var(--navy); margin-bottom:9px}
@@ -249,12 +275,28 @@
 
 <!-- =============================== HERO =============================== -->
 <header class="hero">
-  <div class="goldrule"><i></i><span class="dot"></span><i></i></div>
+  <!-- the crest from the invitation: pennant over crossed clubs, EST · 1936 -->
+  <div class="crest" aria-hidden="true">
+    <svg viewBox="0 0 140 116" fill="none">
+      <path d="M70 6v40" stroke="var(--gold)" stroke-width="2.6" stroke-linecap="round"/>
+      <path d="M71.5 7c9.5 1.6 17 5.2 23 9.2-6 4-13.5 7.6-23 9.2V7z" fill="var(--gold)"/>
+      <g stroke="var(--navy)" stroke-width="3" stroke-linecap="round">
+        <path d="M40 34 96 98"/>
+        <path d="M100 34 44 98"/>
+      </g>
+      <path d="M96.5 97c5.5 1 10.5 3.4 13.8 6.6 2.6 2.6 2.4 5.6-.6 7.2-3.6 2-9.4.8-13.4-2.6-2.4-2-3.6-4.4-3.4-6.6" fill="var(--navy)"/>
+      <path d="M43.5 97c-5.5 1-10.5 3.4-13.8 6.6-2.6 2.6-2.4 5.6.6 7.2 3.6 2 9.4.8 13.4-2.6 2.4-2 3.6-4.4 3.4-6.6" fill="var(--navy)"/>
+    </svg>
+    <div class="est lining">
+      <i></i><span>EST.</span><span class="yr">1936</span><i></i>
+    </div>
+  </div>
   <p class="eyebrow">Please join us in celebrating</p>
   <h1>Bob&rsquo;s <em class="lining">90<span class="th">th</span></em></h1>
   <p class="tagline">ninety years well played</p>
   <p class="whenline lining">Saturday<span class="sep">&middot;</span>October 17<span class="sep">&middot;</span>2026</p>
   <p class="whereline">Virginia Country Club &mdash; Long Beach, California</p>
+  <p class="timesline lining">Cocktails 5:00 PM &nbsp;&mdash;&nbsp; Dinner 6:30 PM</p>
   <a class="cta" href="#rsvp">Kindly Reply</a>
   <span class="thread" aria-hidden="true"></span>
 </header>
@@ -294,6 +336,16 @@
     <h2>Kindly Reply</h2>
     <p>We would be delighted to know whether you can join us.</p>
     <span class="by lining">Please reply by October 1st</span>
+  </div>
+
+  <!-- The essentials travel WITH the form. The CTA jumps straight here, so
+       anything that lives only in the band above gets scrolled past — this
+       strip is what guarantees date, times and place are on screen while the
+       guest is actually replying. -->
+  <div class="recap lining" id="recap">
+    <span>Sat, October 17, 2026</span><span class="rsep">&middot;</span>
+    <span>Cocktails 5:00 &middot; Dinner 6:30</span><span class="rsep">&middot;</span>
+    <span><a href="https://maps.google.com/?q=500+Virginia+Country+Club+Road,+Long+Beach,+CA+90807" target="_blank" rel="noopener">Virginia Country Club, Long Beach</a></span>
   </div>
 
   <form id="rsvpForm" novalidate>
