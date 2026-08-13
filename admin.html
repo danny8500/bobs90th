@@ -206,6 +206,8 @@
         Join couples with &amp; and both names get saved.</label>
       <textarea id="invPaste" rows="5" placeholder="Margaret Ellsworth, margaret@example.com&#10;Tom Brady &amp; Elaine Brady, tbrady@example.com&#10;James Whitfield, jwhitfield@example.com"></textarea>
       <div class="inv-btns">
+        <label class="btn" for="csvFile" style="cursor:pointer">Import a CSV&hellip;</label>
+        <input type="file" id="csvFile" accept=".csv,text/csv,text/plain" style="position:absolute;width:1px;height:1px;opacity:0">
         <button class="btn" onclick="addInvites()">Add to list</button>
         <button class="btn solid" onclick="sendInvites('unsent')">Send to everyone not yet emailed</button>
         <button class="btn" onclick="sendInvites('noreply')">Remind those who haven't replied</button>
@@ -559,13 +561,16 @@ async function addInvites(){
     if(!m){ bad++; return; }
     var email = m[2].trim();
     var whole = m[1].replace(/[,;<]\s*$/, '').trim() || email.split('@')[0];
+    var seatMatch = whole.match(/^(.*?),\s*(\d+)$/);   // "Name, email, 3" lands here as "Name, 3"
+    var explicitSeats = 0;
+    if(seatMatch){ whole = seatMatch[1].trim(); explicitSeats = parseInt(seatMatch[2], 10); }
     /* "Tom Brady & Elaine Brady" is two people on one invitation. Split so we
        store both names and can pre-fill them, rather than treating the pair as
        a single oddly-punctuated guest. */
     var names = whole.split(/\s*(?:&|and|\+)\s*/i)
                      .map(function(x){ return x.trim(); })
                      .filter(Boolean);
-    people.push({ name: names.join(', '), seats: names.length, email: email });
+    people.push({ name: names.join(', '), seats: explicitSeats || names.length, email: email });
   });
   if(!people.length){ invMsg('Could not read an email address on any line.', 'err'); return; }
 
@@ -648,6 +653,105 @@ function renderInvites(){
 document.getElementById('invList').addEventListener('click', function(e){
   var b = e.target.closest('button[data-inv]');
   if(b) delInvite(b.dataset.inv);
+});
+
+
+/* ---------------------------------------------------------------------------
+ * CSV import
+ * Reads the file in the browser — nothing is uploaded — works out which column
+ * holds the email and which holds the name, and drops the result into the box
+ * above so it can be eyeballed before anything is saved. A real CSV can quote
+ * fields that contain commas ("Brady, Tom"), so this parses properly rather
+ * than splitting on commas and hoping.
+ * ------------------------------------------------------------------------- */
+function parseCsv(text){
+  var rows = [], row = [], cell = '', inQuotes = false;
+  text = String(text).split(/\r\n|\r/).join("\n");
+  for(var i = 0; i < text.length; i++){
+    var c = text[i];
+    if(inQuotes){
+      if(c === '"'){
+        if(text[i+1] === '"'){ cell += '"'; i++; }   // "" is an escaped quote
+        else inQuotes = false;
+      } else cell += c;
+    } else if(c === '"'){ inQuotes = true; }
+    else if(c === ',' || c === ';' || c === '	'){ row.push(cell); cell = ''; }
+    else if(c === '\n'){ row.push(cell); rows.push(row); row = []; cell = ''; }
+    else cell += c;
+  }
+  row.push(cell);
+  if(row.length > 1 || row[0].trim()) rows.push(row);
+  return rows.map(function(r){ return r.map(function(x){ return x.trim(); }); })
+             .filter(function(r){ return r.some(Boolean); });
+}
+
+var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function csvToLines(rows){
+  if(!rows.length) return { lines: [], skipped: 0 };
+
+  /* Work out the columns. A header row is one where nothing looks like an
+     email — use its labels; otherwise fall back to finding the cell that IS an
+     email and treating everything else as the name. */
+  var head = rows[0].map(function(h){ return h.toLowerCase(); });
+  var hasHeader = !rows[0].some(function(c){ return EMAIL_RE.test(c); });
+  var iEmail = -1, iName = -1, iFirst = -1, iLast = -1, iSeats = -1;
+
+  if(hasHeader){
+    head.forEach(function(h, i){
+      if(iEmail < 0 && /e-?mail/.test(h)) iEmail = i;
+      if(iFirst < 0 && /first/.test(h)) iFirst = i;
+      if(iLast  < 0 && /last|surname/.test(h)) iLast = i;
+      if(iName  < 0 && /^name|full ?name|guest|invite/.test(h)) iName = i;
+      if(iSeats < 0 && /seat|guests?|party|count|#/.test(h)) iSeats = i;
+    });
+    rows = rows.slice(1);
+  }
+
+  var lines = [], skipped = 0;
+  rows.forEach(function(r){
+    var email = iEmail >= 0 ? r[iEmail] : '';
+    if(!EMAIL_RE.test(email)){
+      email = '';
+      for(var i = 0; i < r.length; i++){ if(EMAIL_RE.test(r[i])){ email = r[i]; break; } }
+    }
+    if(!email){ skipped++; return; }
+
+    var name = '';
+    if(iFirst >= 0 || iLast >= 0) name = [r[iFirst] || '', r[iLast] || ''].join(' ').trim();
+    else if(iName >= 0) name = r[iName] || '';
+    if(!name){
+      name = r.filter(function(c){ return c && !EMAIL_RE.test(c) && !/^\d+$/.test(c); }).join(' ').trim();
+    }
+    if(!name) name = email.split('@')[0];
+
+    var seats = iSeats >= 0 ? parseInt(r[iSeats], 10) : 0;
+    lines.push(name + ', ' + email + (seats > 1 ? ', ' + seats : ''));
+  });
+  return { lines: lines, skipped: skipped };
+}
+
+document.getElementById('csvFile').addEventListener('change', function(){
+  var f = this.files && this.files[0];
+  this.value = '';
+  if(!f) return;
+  var reader = new FileReader();
+  reader.onload = function(){
+    try{
+      var out = csvToLines(parseCsv(String(reader.result || '')));
+      if(!out.lines.length){
+        invMsg('No email addresses found in that file.', 'err');
+        return;
+      }
+      var box = document.getElementById('invPaste');
+      box.value = (box.value.trim() ? box.value.trim() + '\n' : '') + out.lines.join('\n');
+      invMsg('Read ' + out.lines.length + ' from ' + f.name +
+             (out.skipped ? ' — ' + out.skipped + ' row(s) had no email' : '') +
+             '. Check the list, then Add to list.', 'ok');
+    }catch(e){ invMsg('Could not read that file.', 'err'); }
+  };
+  reader.onerror = function(){ invMsg('Could not read that file.', 'err'); };
+  reader.readAsText(f);
 });
 
 function esc(s){
