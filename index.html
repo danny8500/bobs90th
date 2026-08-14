@@ -17,14 +17,38 @@
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<!-- Bodoni Moda is variable on the optical-size axis (6–96). Requesting the full
-     range lets the browser thin the hairlines at display sizes and thicken them
-     at label sizes automatically — without it, 12px small caps in a Didone go
-     spidery and unreadable. -->
-<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Italianno&display=swap" rel="stylesheet">
+<!-- Fonts are served from this site, not from Google.
+     Two reasons. Speed: the Google route costs a round trip to fonts.googleapis
+     for the stylesheet and another to fonts.gstatic for the file itself, on
+     connections that have to be opened first. And correctness: "display=swap"
+     means "paint in a fallback face, then swap" - which is exactly the flicker
+     of the page changing fonts a moment after it appears.
+
+     Same origin + preload means the files are already in flight with the HTML,
+     and font-display:block says never paint the wrong face - wait (briefly) and
+     paint the right one. Bodoni Moda is variable on the optical-size axis
+     (6-96), which is what keeps 12px small caps from going spidery while the
+     display sizes stay hairline-fine. -->
+<link rel="preload" href="fonts/bodoni-moda-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/italianno-latin.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/bodoni-moda-latin-italic.woff2" as="font" type="font/woff2" crossorigin>
 <style>
+  @font-face{
+    font-family:'Bodoni Moda'; font-style:normal; font-weight:400 500;
+    font-display:block; src:url('fonts/bodoni-moda-latin.woff2') format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  }
+  @font-face{
+    font-family:'Bodoni Moda'; font-style:italic; font-weight:400;
+    font-display:block; src:url('fonts/bodoni-moda-latin-italic.woff2') format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  }
+  @font-face{
+    font-family:'Italianno'; font-style:normal; font-weight:400;
+    font-display:block; src:url('fonts/italianno-latin.woff2') format('woff2');
+    unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+2074,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD;
+  }
+
   /* ==========================================================================
    * Bob's 90th — an event site INSPIRED by the invitation, not a copy of it.
    * What carries over: navy ink, antique gold, warm cream, engraved serif caps
