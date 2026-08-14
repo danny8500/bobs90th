@@ -312,7 +312,7 @@ function sendInvites(p) {
   var sheet = invitesSheet();
   var data = sheet.getDataRange().getValues();
   var only = p.only || 'unsent';
-  var sent = 0, skipped = 0, failed = 0, quota = 0;
+  var sent = 0, skipped = 0, failed = 0, quota = 0, used = 0;
 
   try { quota = MailApp.getRemainingDailyQuota(); } catch (e) { quota = 0; }
 
@@ -330,7 +330,12 @@ function sendInvites(p) {
 
     if (only === 'unsent'  && wasSent) { skipped++; continue; }
     if (only === 'noreply' && replied) { skipped++; continue; }
-    if (sent >= quota) { skipped++; continue; }
+
+    /* Gmail's daily allowance counts RECIPIENTS, not messages, so a household
+       with three addresses costs three. Stop before going over rather than
+       failing halfway through - what is left is simply sent tomorrow. */
+    var heads = emailList(em).length || 1;
+    if (used + heads > quota) { skipped++; continue; }
 
     var link = SITE_URL + '?i=' + encodeURIComponent(token);
     var first = String(nm).split(/\s+/)[0];
@@ -345,10 +350,10 @@ function sendInvites(p) {
       MailApp.sendEmail(msg);
       sheet.getRange(i + 1, 5).setValue(new Date());
       logEvent(wasSent ? 'Invitation resent' : 'Invitation sent', nm, em, 'you');
-      sent++;
+      sent++; used += heads;
     } catch (err) { failed++; }
   }
-  return json({ ok: true, sent: sent, skipped: skipped, failed: failed, quotaLeft: Math.max(0, quota - sent) });
+  return json({ ok: true, sent: sent, skipped: skipped, failed: failed, quotaLeft: Math.max(0, quota - used) });
 }
 
 /**
@@ -588,11 +593,24 @@ function findInvite(token) {
   }
   return -1;
 }
+/* An invitation can carry several addresses - a household where each person
+   has their own inbox. Any one of them identifies the invitation, so importing
+   the same list twice updates that line instead of inviting the family again. */
+function emailList(cell) {
+  return String(cell || '').split(/[,;]+/)
+    .map(function (x) { return x.trim().toLowerCase(); })
+    .filter(Boolean);
+}
+
 function findInviteByEmail(email) {
-  var key = String(email).trim().toLowerCase();
+  var keys = emailList(email);
+  if (!keys.length) return -1;
   var data = invitesSheet().getDataRange().getValues();
   for (var i = 1; i < data.length; i++) {
-    if (String(data[i][2]).trim().toLowerCase() === key) return i + 1;
+    var have = emailList(data[i][2]);
+    for (var k = 0; k < keys.length; k++) {
+      if (have.indexOf(keys[k]) >= 0) return i + 1;
+    }
   }
   return -1;
 }
