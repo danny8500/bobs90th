@@ -210,23 +210,10 @@
     background-image:url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%231B3A63' stroke-width='1.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-repeat:no-repeat; background-position:right 14px center; background-size:17px; padding-right:42px}
 
-  .choices{display:grid; grid-template-columns:1fr 1fr; gap:14px}
-  @media(max-width:470px){ .choices{grid-template-columns:1fr} }
-  .choice{position:relative}
-  .choice input{position:absolute; opacity:0; width:0; height:0}
-  /* direct child only — a bare `.choice span` would also style the spans inside */
-  .choice > span{
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px;
-    min-height:104px; padding:18px 12px; cursor:pointer; text-align:center;
-    background:var(--paper); border:1px solid var(--rule);
-    transition:border-color .16s, background .16s, color .16s, box-shadow .16s;
-  }
-  .choice .big{display:block; font-family:var(--display); font-size:22px; font-weight:400; letter-spacing:.02em; line-height:1.22}
-  .choice .small{display:block; font-size:13.5px; color:var(--muted); letter-spacing:.04em; font-style:italic}
-  .choice > span:hover{border-color:var(--gold)}
-  .choice input:focus-visible + span{box-shadow:0 0 0 3px rgba(180,143,69,.3)}
-  .choice input:checked + span{background:var(--navy); border-color:var(--navy); color:var(--cream)}
-  .choice input:checked + span .small{color:rgba(246,241,227,.72)}
+  /* The form no longer asks for a headcount, it works one out - so say it back
+     to them. A wrong number is only obvious if it is on the page. */
+  .party-tot{margin-top:10px; font-family:var(--serif); font-size:13.5px; font-style:italic;
+    letter-spacing:.03em; color:var(--muted)}
 
   /* ---- "you've already replied" ---- */
   .known{
@@ -327,9 +314,9 @@
   .slot .n{flex:none; width:74px; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
   .slot input{flex:1}
 
-  /* Party size stays visible whatever they answer - a guest reading the form
-     top to bottom should never wonder where the box went. It simply reads as
-     part of the form; a decline still records zero regardless. */
+  /* The additional-guests box stays visible whatever they answer - a guest
+     reading the form top to bottom should never wonder where it went. A decline
+     with nobody added still records zero regardless. */
   #guestRow{display:block}
   @keyframes slidein{from{opacity:0; transform:translateY(-5px)}to{opacity:1; transform:none}}
 
@@ -522,44 +509,33 @@
       </div>
     </div>
 
-    <!-- Only for invitations naming more than one person. An invitation to a
-         couple is frequently answered by one of them, and "party of 1" cannot
-         say which - so each person gets their own answer. -->
+    <!-- The one place anybody says yes or no. An invitation to a couple is
+         frequently answered by one of them, and "party of 1" cannot say which -
+         so each person named gets their own answer. Everyone else gets a single
+         row of their own, which is why this is asked here and nowhere else. -->
     <div class="field" id="whoRow" hidden>
-      <label class="lab">Who can make it?</label>
+      <label class="lab" id="whoLab">Who can make it?</label>
       <div id="whoList"></div>
     </div>
 
     <div class="field" id="guestRow">
-      <label class="lab" for="guests">Total in your party <span class="opt">&mdash; including yourself</span></label>
+      <label class="lab" for="guests">Any additional guests? <span class="opt">&mdash; optional</span></label>
+      <p class="dz-help">Only people you are bringing who are not named above.</p>
       <select id="guests" name="guests" class="lining">
-        <option value="1">1 guest</option>
-        <option value="2" selected>2 guests</option>
-        <option value="3">3 guests</option>
-        <option value="4">4 guests</option>
-        <option value="5">5 guests</option>
-        <option value="6">6 guests</option>
+        <option value="0" selected>No one else</option>
+        <option value="1">1 additional guest</option>
+        <option value="2">2 additional guests</option>
+        <option value="3">3 additional guests</option>
+        <option value="4">4 additional guests</option>
+        <option value="5">5 additional guests</option>
       </select>
+      <div class="party-tot" id="partyTot" hidden></div>
     </div>
 
     <div class="field" id="namesRow" hidden>
       <label class="lab">Who is coming with you?</label>
       <p class="dz-help">We need everyone by name for the seating chart and place cards.</p>
       <div id="nameSlots"></div>
-    </div>
-
-    <div class="field">
-      <label class="lab">Will you be attending?</label>
-      <div class="choices">
-        <label class="choice">
-          <input type="radio" name="attending" value="yes" required>
-          <span><span class="big">Joyfully Accepts</span><span class="small">Count me in</span></span>
-        </label>
-        <label class="choice">
-          <input type="radio" name="attending" value="no" required>
-          <span><span class="big">Regretfully Declines</span><span class="small">Wish I could</span></span>
-        </label>
-      </div>
     </div>
 
     <div class="field">
@@ -620,51 +596,65 @@ var form = document.getElementById('rsvpForm');
 var msg  = document.getElementById('msg');
 var btn  = document.getElementById('submitBtn');
 
-/* The headcount and the name boxes sit ABOVE the accept/decline question, so
-   they are driven by the number chosen rather than by an answer the guest has
-   not reached yet: pick 2 and a name box appears, whatever they say further
-   down. A decline simply sends a party of zero - the boxes are left alone
-   rather than yanked away under the cursor. */
+/* Yes-or-no is asked once, per person, ABOVE this box. What is asked here is
+   only "anyone else?" - so the count means people IN ADDITION to those named,
+   never a total. The headcount the Sheet wants is worked out from the two
+   together at submit, which is the one place it is needed. */
 document.getElementById('findEmail').addEventListener('keydown', function(e){
   if(e.key === 'Enter'){ e.preventDefault(); findMe(); }
 });
 
 document.getElementById('guests').addEventListener('change', function(){
-  /* Raising the box on a group invitation means bringing someone additional,
-     so remember the difference and keep it as the named answers change. */
-  if(WHO.length){
-    EXTRAS = Math.max(0, (parseInt(this.value, 10) || 0) - whoPicked('yes').length);
-  }
+  EXTRAS = parseInt(this.value, 10) || 0;
   buildSlots();
 });
 
-/* One box per additional head. Party of 1 asks for nobody; party of 4 asks for
-   three names. Existing entries survive a change of count, so bumping 3 to 4
-   does not wipe what they already typed. */
+/* Sets the box and everything that follows from it, so the one-line answer to
+   "how many extras" cannot drift from what is on screen. */
+function setExtras(n){
+  EXTRAS = Math.max(0, Math.min(5, n || 0));
+  document.getElementById('guests').value = String(EXTRAS);
+  buildSlots();
+}
+
+/* One box per additional guest, and none at all when they are not bringing
+   anybody. Existing entries survive a change of count, so bumping 1 to 2 does
+   not wipe what they already typed. */
 function buildSlots(){
-  var n = parseInt(document.getElementById('guests').value, 10) || 1;
-  /* Anyone already named on the invitation and marked coming is accounted for;
-     a box is only needed for each head beyond them. */
-  var base = WHO.length ? whoPicked('yes').length : 1;
-  var extra = Math.max(0, n - base);
   var wrap = document.getElementById('nameSlots');
   var had = [].map.call(wrap.querySelectorAll('input'), function(i){ return i.value; });
   var html = '';
-  for(var i = 0; i < extra; i++){
-    html += '<div class="slot"><span class="n">Guest ' + (base + i + 1) + '</span>' +
+  for(var i = 0; i < EXTRAS; i++){
+    html += '<div class="slot"><span class="n">Guest ' + (i + 1) + '</span>' +
             '<input type="text" class="gname" placeholder="First and last name" value="' +
             esc(had[i] || '') + '"></div>';
   }
   wrap.innerHTML = html;
-  document.getElementById('namesRow').hidden = (extra < 1);
+  document.getElementById('namesRow').hidden = (EXTRAS < 1);
+  updateTotal();
+}
+
+/* Heads at the table: the named people who said yes, plus whoever they are
+   bringing on top. This is the number the Sheet stores as "party of". */
+function headcount(){ return whoPicked('yes').length + EXTRAS; }
+
+/* Nobody types a total any more, so show the one we derived. Silent arithmetic
+   is the kind a guest cannot correct. */
+function updateTotal(){
+  var el = document.getElementById('partyTot');
+  if(!el) return;
+  var n = headcount();
+  el.textContent = n > 0 ? 'That makes ' + n + ' in your party.' : '';
+  el.hidden = (n < 1);
 }
 
 /* Everyone attending on this invitation, by name: the named people who said
-   yes, plus anyone typed into the extra-guest boxes. On a plain one-person
-   invitation that is just the extras, exactly as before. */
+   yes, plus anyone typed into the extra-guest boxes. When the only row is the
+   guest themself their name is already on the reply, so it is just the extras -
+   exactly as before. */
 function comingList(){
   var extras = collectGuestNames();
-  if(!WHO.length) return extras;
+  if(!FROM_INVITE) return extras;
   var named = whoPicked('yes');
   return named.concat(extras ? extras.split(',').map(function(x){ return x.trim(); }).filter(Boolean) : []).join(', ');
 }
@@ -720,12 +710,45 @@ function nameList(names){
   return n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
 }
 
-/* Each named person gets a Yes/No of their own. The party-size box below then
-   follows the number of yeses, and can still be raised to bring someone else. */
-var WHO = [], EXTRAS = 0;   // named people, and heads added beyond them
+/* Everybody gets a Yes/No of their own, and this is the only place the question
+   is asked. An invitation naming two people lists both, because "party of 1"
+   cannot say which of them is coming; anyone else gets a single row for
+   themselves. FROM_INVITE marks the first case - it is the only one where the
+   people in this list are names the reply has to carry, since a lone row is
+   just the guest whose name is already at the top of the form. */
+var WHO = [], EXTRAS = 0, FROM_INVITE = false;
 
 function buildWho(names, existingReply){
+  FROM_INVITE = true;
   WHO = names.slice();
+  setExtras(0);          // the seats we held are these named people, not additions
+  renderWho(existingReply);
+}
+
+/* No invitation, or one naming a single person: they still need somewhere to
+   say yes or no. The row follows the name box above, which is the only place we
+   learn who they are - so it starts as "You" and takes their name as they type. */
+function selfRow(){
+  if(FROM_INVITE) return;
+  WHO = [selfName()];
+  renderWho(null);
+}
+
+function selfName(){
+  var n = nameEl ? nameEl.value.trim() : '';
+  return n || 'You';
+}
+
+/* Only the caption changes as they type. Re-rendering the row would throw away
+   an answer they have already given. */
+function refreshSelfName(){
+  if(FROM_INVITE || !WHO.length) return;
+  WHO[0] = selfName();
+  var cell = document.querySelector('#whoList .who-n');
+  if(cell) cell.textContent = WHO[0];
+}
+
+function renderWho(existingReply){
   var coming = {}, declined = {};
   if(existingReply){
     String(existingReply.guestNames || '').split(',').forEach(function(n){ if(n.trim()) coming[norm(n)] = true; });
@@ -741,30 +764,16 @@ function buildWho(names, existingReply){
       '</span></div>';
   });
   document.getElementById('whoList').innerHTML = html;
+  document.getElementById('whoLab').textContent =
+    WHO.length > 1 ? 'Who can make it?' : 'Will you be attending?';
   document.getElementById('whoRow').hidden = false;
-  EXTRAS = 0;   // the seats we held are these named people, not additions
   document.querySelectorAll('#whoList input').forEach(function(r){
-    r.addEventListener('change', syncFromWho);
+    r.addEventListener('change', updateTotal);
   });
-  syncFromWho();
+  updateTotal();
 }
 
 function norm(s){ return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
-
-/* The named answers drive everything below them: the headcount starts at the
-   number coming, and the whole invitation counts as a "no" only when nobody is. */
-function syncFromWho(){
-  if(!WHO.length) return;
-  var yes = whoPicked('yes');
-  var sel = document.getElementById('guests');
-  var want = String(Math.max(1, yes.length + EXTRAS));
-  if([].some.call(sel.options, function(o){ return o.value === want; })) sel.value = want;
-  buildSlots();
-
-  var anyone = yes.length > 0;
-  var r = document.querySelector('input[name=attending][value=' + (anyone ? 'yes' : 'no') + ']');
-  if(r && whoAllAnswered()) r.checked = true;
-}
 
 function whoPicked(v){
   return WHO.filter(function(n, i){
@@ -791,38 +800,48 @@ async function greetInvitee(){
 function applyInvitation(d){
   var inv = d.invite;
 
-  /* Already answered, here or on another device? Show the reply rather than an
-     empty form, and remember it in this browser too. */
-  if(d.reply && d.reply.name){
-    saveReply({ name: d.reply.name, attending: d.reply.attending,
-                guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0 });
-    if(renderReturning(d.reply, true)) return true;
-  } else {
-    /* The Sheet has no reply for this invitation, so anything this browser
-       remembers is out of date - forget it and show a clean form. */
-    forgetReply();
-  }
+  /* The form is filled in first even when we are about to show the reply
+     instead of it. "Change my reply" reveals this very form, and a couple's
+     invitation has to come back with a row for each of them - the accept and
+     decline buttons are gone, so those rows are the only way to answer.
 
-  /* All of it stays editable - plans change, and an invitation addressed to a
+     All of it stays editable - plans change, and an invitation addressed to a
      couple is often answered by one of them. */
   if(!nameEl.value && inv.name){
     nameEl.value = inv.name;
     lastLooked = String(inv.name).toLowerCase();
   }
-  /* Several people on one invitation: ask each of them separately. */
+  /* Several people on one invitation: ask each of them separately. Otherwise
+     the single row above just takes the name we now know. */
   if(inv.names && inv.names.length > 1) buildWho(inv.names, d.reply);
+  else refreshSelfName();
 
   var seats = parseInt(inv.seats, 10) || 1;
-  if(seats > 1 && !WHO.length){
-    /* Their seats are filled in, but accept/decline is left blank - holding
-       two seats is not the same as saying yes on their behalf. */
-    var sel = document.getElementById('guests');
-    if([].some.call(sel.options, function(o){ return o.value === String(seats); })) sel.value = String(seats);
-    buildSlots();
+  if(seats > 1 && !FROM_INVITE){
+    /* One name but more than one seat: the rest are additional guests, so fill
+       the box in for them. Coming/can't is still left blank - holding two seats
+       is not the same as saying yes on their behalf. */
+    setExtras(seats - 1);
     var extra = (inv.names || []).slice(1);
     [].forEach.call(document.querySelectorAll('#nameSlots input'), function(input, i){
       if(extra[i]) input.value = extra[i];
     });
+  }
+
+  /* Already answered, here or on another device? Show the reply rather than an
+     empty form, and remember it in this browser too. The form we just filled in
+     waits behind it for "Change my reply". */
+  if(d.reply && d.reply.name){
+    saveReply({ name: d.reply.name, attending: d.reply.attending,
+                guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0 });
+    if(renderReturning(d.reply, true)){
+      var b = document.getElementById('invited'); if(b) b.hidden = true;
+      return true;
+    }
+  } else {
+    /* The Sheet has no reply for this invitation, so anything this browser
+       remembers is out of date - forget it and show a clean form. */
+    forgetReply();
   }
 
   var el = document.getElementById('invited');
@@ -871,6 +890,11 @@ async function findMe(){
   findMsg('Looking…');
   try{
     var d = await fetch(ENDPOINT + '?find=' + encodeURIComponent(em)).then(function(r){ return r.json(); });
+    /* An older backend has no ?find= route and falls through to its admin
+       branch, which answers with an error. Telling a guest "we could not find
+       that address" would be a lie about their invitation, so take the offer
+       off the page instead and let them fill the form in as normal. */
+    if(d && d.error){ skipFind(); return; }
     if(!d || !d.found){
       /* Never a dead end - plenty of people were invited by someone else, or
          are answering for a guest who forwarded it on. */
@@ -970,11 +994,10 @@ function renderReturning(r, fromLink){
 function notMe(){
   forgetReply();
   INVITE_TOKEN = '';
-  WHO = []; EXTRAS = 0;
+  WHO = []; EXTRAS = 0; FROM_INVITE = false;
   AMENDING = false; EXISTING = null; lastLooked = '';
 
   form.reset();
-  document.getElementById('whoRow').hidden = true;
   document.getElementById('whoList').innerHTML = '';
   document.getElementById('namesRow').hidden = true;
   document.getElementById('nameSlots').innerHTML = '';
@@ -983,7 +1006,8 @@ function notMe(){
   hideKnown();
   btn.textContent = 'Send Reply';
   show('', '');
-  buildSlots();
+  setExtras(0);
+  selfRow();
 
   nameEl.focus();
   document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
@@ -1000,6 +1024,7 @@ function changeMyReply(){
 
   if(r && r.name){
     nameEl.value = r.name;
+    refreshSelfName();                   // the yes/no row is captioned with it
     lastLooked = r.name.toLowerCase();   // suppress the "already replied" notice; they know
     AMENDING = true;
     var banner = document.getElementById('amending');
@@ -1021,6 +1046,7 @@ nameEl.addEventListener('input', function(){
   /* If they edit the name after being warned, the warning no longer applies. */
   clearTimeout(lookupTimer);
   if (!AMENDING) hideKnown();
+  refreshSelfName();
   lookupTimer = setTimeout(maybeLookup, 900);
 });
 
@@ -1061,7 +1087,7 @@ function allowChange(){
     'Photos already sent are kept, and new ones are added.';
   banner.hidden = false;
   btn.textContent = 'Update My Reply';
-  document.querySelector('.choices').scrollIntoView({ behavior:'smooth', block:'center' });
+  document.getElementById('whoRow').scrollIntoView({ behavior:'smooth', block:'center' });
 }
 
 /* Two guests can genuinely share a name. Saying so keeps their reply separate
@@ -1196,42 +1222,51 @@ function progress(pct, text){
 form.addEventListener('submit', async function(e){
   e.preventDefault();
   var name = document.getElementById('name').value.trim();
-  var picked = document.querySelector('input[name=attending]:checked');
-  var yes = picked && picked.value === 'yes';
 
   if(!name){ show('err','Please enter your name.'); document.getElementById('name').focus(); return; }
   /* A single word is almost always a first name only, which makes two "Jim"s
      impossible to tell apart on the guest list — and the backend now keys on
      the name, so it would also overwrite one with the other. */
   if(name.split(/\s+/).length < 2){ show('err','Please include a last name too.'); document.getElementById('name').focus(); return; }
-  if(WHO.length && !whoAllAnswered()){
-    show('err','Please say who can make it — tap Coming or Can’t beside each name.');
+  /* The only yes/no on the form now, so an unanswered row is an unanswered
+     RSVP - there is no second question further down to fall back on. */
+  if(!whoAllAnswered()){
+    show('err', WHO.length > 1
+      ? 'Please say who can make it — tap Coming or Can’t beside each name.'
+      : 'Please let us know whether you can attend.');
     document.getElementById('whoRow').scrollIntoView({ behavior:'smooth', block:'center' });
     return;
   }
-  if(!picked){ show('err','Please let us know whether you can attend.'); return; }
-  if(yes){
-    /* On a group invitation the named people are already accounted for, so only
-       the guests added beyond them need names typing in. */
-    var namedYes = WHO.length ? whoPicked('yes').length : 1;
-    var want = (parseInt(document.getElementById('guests').value, 10) || 1) - namedYes;
+
+  /* Nobody coming and nobody brought is the decline. */
+  var heads = headcount();
+  var yes = heads > 0;
+
+  if(EXTRAS > 0){
     var got = collectGuestNames().split(',').filter(function(x){ return x.trim(); }).length;
-    if(got < want){
+    if(got < EXTRAS){
       show('err','Please add the name of everyone in your party — we need them for the seating chart.');
-      var blank = document.querySelector('#nameSlots input[value=""], #nameSlots input:not([value])');
-      (blank || document.querySelector('#nameSlots input')).focus();
+      var blank = [].filter.call(document.querySelectorAll('#nameSlots input'), function(i){ return !i.value.trim(); })[0];
+      var focusOn = blank || document.querySelector('#nameSlots input');
+      if(focusOn) focusOn.focus();
       return;
     }
   }
 
+  /* A lone row is the guest themself and their name is already on the reply, so
+     it only goes in notComing when they are declining but still sending someone
+     - otherwise attending:'no' has already said it. */
+  var declined = FROM_INVITE ? whoPicked('no').join(', ')
+                             : (yes && whoPicked('no').length ? name : '');
+
   var payload = {
     type:'rsvp', name:name,
     attending: yes ? 'yes' : 'no',
-    guests: yes ? (document.getElementById('guests').value || '1') : '0',
+    guests: String(yes ? heads : 0),
     photoCount: PHOTOS.length,
     toast: document.getElementById('toast').value.trim(),
     guestNames: yes ? comingList() : '',
-    notComing: WHO.length ? whoPicked('no').join(', ') : '',
+    notComing: declined,
     invite: INVITE_TOKEN
   };
 
@@ -1344,6 +1379,10 @@ function esc(s){
    already replied" is far worse than being asked twice. Without a token there
    is nothing to check against, so local memory is all we have. */
 try{
+  /* The yes/no row has to exist before anything else touches the form - an
+     invitation naming two people replaces it, everyone else keeps it. */
+  selfRow();
+  setExtras(0);
   if(INVITE_TOKEN) greetInvitee();
   else if(!showReturning()) offerFind();
 }catch(e){}
