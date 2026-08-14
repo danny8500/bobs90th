@@ -22,7 +22,11 @@ var SITE_URL  = 'https://bobs90th.com/';
 var SEND_RSVP_ALERTS = false;   // per-RSVP emails to you; off to save the daily mail quota
 // ==========================================================================
 
-var HEADERS  = ['Timestamp', 'Name', 'Attending', 'Party size', 'Photos', 'Notes', 'Guest names', 'Invite'];
+/* 'Coming' lists everyone attending on this invitation by name (the contact
+   included), and 'Not coming' the ones who declined - an invitation to three
+   people where one cannot make it is the normal case, and a party-size number
+   on its own cannot say which of them it is. */
+var HEADERS  = ['Timestamp', 'Name', 'Attending', 'Party size', 'Photos', 'Notes', 'Coming', 'Invite', 'Not coming'];
 var IHEADERS = ['Token', 'Invited', 'Email', 'Seats', 'Sent', 'Opened', 'Replied'];
 
 // ============================== ROUTING ===================================
@@ -73,7 +77,7 @@ function doGet(e) {
     if (rrow > 0) {
       var rv = rsvpSheet().getRange(rrow, 1, 1, HEADERS.length).getValues()[0];
       reply = { name: rv[1], attending: rv[2], guests: rv[3], photos: rv[4],
-                toast: rv[5], guestNames: rv[6],
+                toast: rv[5], guestNames: rv[6], notComing: rv[8] || '',
                 when: rv[0] ? new Date(rv[0]).toISOString() : '' };
     }
 
@@ -94,7 +98,7 @@ function doGet(e) {
     return json({
       found: true,
       rsvp: { name: lv[1], attending: lv[2], guests: lv[3], photos: lv[4],
-              toast: lv[5], guestNames: lv[6],
+              toast: lv[5], guestNames: lv[6], notComing: lv[8] || '',
               when: lv[0] ? new Date(lv[0]).toISOString() : '' }
     });
   }
@@ -113,7 +117,8 @@ function doGet(e) {
       photos:     data[i][4],
       toast:      data[i][5],
       guestNames: data[i][6],
-      invite:     data[i][7]
+      invite:     data[i][7],
+      notComing:  data[i][8] || ''
     });
   }
   rows.sort(function (a, b) { return (b.timestamp || '').localeCompare(a.timestamp || ''); });
@@ -162,6 +167,7 @@ function saveRsvp(p) {
   var photos    = Math.max(0, Math.min(20, parseInt(p.photoCount, 10) || 0));
   var note      = String(p.toast || '').trim().slice(0, 1200);
   var names     = String(p.guestNames || '').trim().slice(0, 600);
+  var declined  = String(p.notComing  || '').trim().slice(0, 600);
   var token     = String(p.invite || '').trim().slice(0, 24);
 
   if (!name) return json({ error: 'A name is required.' });
@@ -179,7 +185,7 @@ function saveRsvp(p) {
   }
 
   var values = [new Date(), name, attending, guests, oldPhotos + photos,
-                note || oldNote, names, token || oldToken];
+                note || oldNote, names, token || oldToken, declined];
   if (row > 0) sheet.getRange(row, 1, 1, values.length).setValues([values]);
   else         sheet.appendRow(values);
 
@@ -231,9 +237,11 @@ function adminUpdate(p) {
   var names   = p.guestNames === undefined ? (sheet.getRange(row, 7).getValue() || '')
                                            : String(p.guestNames || '').trim().slice(0, 600);
   var token   = sheet.getRange(row, 8).getValue() || '';
+  var declined = p.notComing === undefined ? (sheet.getRange(row, 9).getValue() || '')
+                                           : String(p.notComing || '').trim().slice(0, 600);
 
   sheet.getRange(row, 1, 1, HEADERS.length)
-       .setValues([[new Date(), name, attending, guests, photos, note, names, token]]);
+       .setValues([[new Date(), name, attending, guests, photos, note, names, token, declined]]);
 
   var renamed = 0;
   if (norm(oldName) !== norm(name)) renamed = renamePhotos(oldName, name);

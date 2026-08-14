@@ -101,6 +101,7 @@
   .mini:hover{border-color:var(--gold)}
   .mini.del{color:var(--red)} .mini.del:hover{border-color:var(--red)}
   .mini.send{color:var(--green); border-color:rgba(31,107,63,.35)} .mini.send:hover{border-color:var(--green)}
+  .declined{margin-top:3px; font-size:11.5px; color:var(--red); font-style:italic}
 
   /* ---- edit dialog ---- */
   .ov{position:fixed; inset:0; background:rgba(14,32,56,.55); display:none;
@@ -265,6 +266,8 @@
   </select>
   <label for="eGuestNames">Bringing <span style="text-transform:none;letter-spacing:0;font-style:italic">(comma separated)</span></label>
   <input type="text" id="eGuestNames">
+  <label for="eNotComing">Not coming <span style="text-transform:none;letter-spacing:0;font-style:italic">(comma separated)</span></label>
+  <input type="text" id="eNotComing">
   <label for="eToast">Notes</label>
   <textarea id="eToast"></textarea>
   <div class="dlg-err" id="eErr"></div>
@@ -374,7 +377,7 @@ function render(){
   el.innerHTML =
     '<table><thead><tr>' +
       '<th>Guest</th><th>Reply</th><th style="text-align:center">Party</th>' +
-      '<th>Bringing</th><th style="text-align:center">Photos</th>' +
+      '<th>Coming</th><th style="text-align:center">Photos</th>' +
       '<th class="note-h">Notes</th><th class="when-h">Received</th><th></th>' +
     '</tr></thead><tbody>' +
     rows.map(function(r){
@@ -385,7 +388,10 @@ function render(){
         '<td><div class="nm">' + esc(r.name) + '</div></td>' +
         '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' + (yes ? 'Attending' : 'Declined') + '</span></td>' +
         '<td class="num">' + (yes ? esc(r.guests || '1') : '—') + '</td>' +
-        '<td class="bringing">' + (r.guestNames ? esc(r.guestNames) : '<span style="color:#A9B3C1">—</span>') + '</td>' +
+        '<td class="bringing">' +
+          (r.guestNames ? esc(r.guestNames) : '<span style="color:#A9B3C1">—</span>') +
+          (r.notComing ? '<div class="declined">can’t: ' + esc(r.notComing) + '</div>' : '') +
+        '</td>' +
         '<td class="num">' + (n ? n : '<span style="color:#A9B3C1">—</span>') + '</td>' +
         '<td class="note">' + (r.toast ? esc(r.toast) : '<span style="color:#A9B3C1">—</span>') + '</td>' +
         '<td class="when-col">' + esc(fmt(r.timestamp)) + '</td>' +
@@ -410,11 +416,11 @@ function fmt(ts){
 function exportCsv(){
   var rows = visible();
   if(!rows.length){ alert('Nothing to export.'); return; }
-  var head = ['Name','Attending','Party size','Bringing','Photos','Notes','Received'];
+  var head = ['Name','Attending','Party size','Coming','Not coming','Photos','Notes','Received'];
   var body = rows.map(function(r){
     return [r.name, r.attending === 'yes' ? 'Yes' : 'No',
             r.attending === 'yes' ? (r.guests || '1') : '0',
-            r.guestNames || '', parseInt(r.photos, 10) || 0, r.toast || '', fmt(r.timestamp)];
+            r.guestNames || '', r.notComing || '', parseInt(r.photos, 10) || 0, r.toast || '', fmt(r.timestamp)];
   });
   var csv = [head].concat(body).map(function(cols){
     return cols.map(function(c){ return '"' + String(c == null ? '' : c).replace(/"/g,'""') + '"'; }).join(',');
@@ -456,6 +462,7 @@ function openEdit(encName){
   document.getElementById('eAttending').value = r.attending === 'yes' ? 'yes' : 'no';
   document.getElementById('eGuests').value = String(parseInt(r.guests, 10) || 1);
   document.getElementById('eGuestNames').value = r.guestNames || '';
+  document.getElementById('eNotComing').value = r.notComing || '';
   document.getElementById('eToast').value = r.toast || '';
   document.getElementById('eErr').textContent = '';
   syncGuestState();
@@ -506,6 +513,7 @@ async function saveEdit(){
       attending: attending,
       guests: attending === 'yes' ? document.getElementById('eGuests').value : '0',
       guestNames: document.getElementById('eGuestNames').value.trim(),
+      notComing:  document.getElementById('eNotComing').value.trim(),
       toast: document.getElementById('eToast').value.trim()
     });
     closeEdit();
