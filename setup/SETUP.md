@@ -63,7 +63,13 @@ GitHub Pages redeploys in about a minute.
 
 Edit `Code.gs`, paste it into the Apps Script editor, save — **then**
 **Deploy ▸ Manage deployments ▸ ✏️ ▸ Version: New version ▸ Deploy**.
-Saving alone does *not* update the live URL. Currently on Version 8.
+Saving alone does *not* update the live URL. Currently on Version 15.
+
+**If the version dropdown in "Manage deployments" refuses to open** (it does,
+sometimes, and no amount of clicking helps): use **Deploy ▸ New deployment**
+instead. That always works. It hands you a NEW /exec URL, so update `ENDPOINT`
+at the top of `public/index.html` and `public/admin.html` to match, and push.
+Nothing else breaks - guests only ever visit bobs90th.com, never the script URL.
 
 **To test a change without deploying**, use the head URL, which always runs the
 last *saved* code:
