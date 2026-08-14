@@ -576,16 +576,20 @@ document.getElementById('guests').addEventListener('change', buildSlots);
    does not wipe what they already typed. */
 function buildSlots(){
   var n = parseInt(document.getElementById('guests').value, 10) || 1;
+  /* Anyone already named on the invitation and marked coming is accounted for;
+     a box is only needed for each head beyond them. */
+  var base = WHO.length ? whoPicked('yes').length : 1;
+  var extra = Math.max(0, n - base);
   var wrap = document.getElementById('nameSlots');
   var had = [].map.call(wrap.querySelectorAll('input'), function(i){ return i.value; });
   var html = '';
-  for(var i = 2; i <= n; i++){
-    html += '<div class="slot"><span class="n">Guest ' + i + '</span>' +
+  for(var i = 0; i < extra; i++){
+    html += '<div class="slot"><span class="n">Guest ' + (base + i + 1) + '</span>' +
             '<input type="text" class="gname" placeholder="First and last name" value="' +
-            esc(had[i-2] || '') + '"></div>';
+            esc(had[i] || '') + '"></div>';
   }
   wrap.innerHTML = html;
-  document.getElementById('namesRow').hidden = (n < 2);
+  document.getElementById('namesRow').hidden = (extra < 1);
 }
 
 /* Everyone attending on this invitation, by name: the named people who said
@@ -671,6 +675,9 @@ function buildWho(names, existingReply){
   });
   document.getElementById('whoList').innerHTML = html;
   document.getElementById('whoRow').hidden = false;
+  /* The seats we held are these named people, so the headcount starts level
+     with them - anything above it is a genuinely extra guest. */
+  document.getElementById('guests').dataset.namedYes = String(WHO.length);
   document.querySelectorAll('#whoList input').forEach(function(r){
     r.addEventListener('change', syncFromWho);
   });
@@ -746,10 +753,15 @@ async function greetInvitee(){
       var sel = document.getElementById('guests');
       if([].some.call(sel.options, function(o){ return o.value === String(seats); })) sel.value = String(seats);
       buildSlots();
-      var extra = (inv.names || []).slice(1);
-      [].forEach.call(document.querySelectorAll('#nameSlots input'), function(input, i){
-        if(extra[i]) input.value = extra[i];
-      });
+      /* Only when one person holds several seats. On a group invitation each
+         name has its own answer above, so repeating them here would count
+         them twice - including whoever just said they cannot come. */
+      if(!WHO.length){
+        var extra = (inv.names || []).slice(1);
+        [].forEach.call(document.querySelectorAll('#nameSlots input'), function(input, i){
+          if(extra[i]) input.value = extra[i];
+        });
+      }
     }
 
     var el = document.getElementById('invited');
