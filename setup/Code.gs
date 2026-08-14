@@ -118,10 +118,24 @@ function doGet(e) {
   }
   rows.sort(function (a, b) { return (b.timestamp || '').localeCompare(a.timestamp || ''); });
 
+  /* Who has actually replied, according to the RSVP rows themselves. The
+     Replied stamp alone is not enough: deleting a reply straight out of the
+     Sheet leaves the stamp behind, and that guest would then be quietly
+     skipped by "remind those who haven't replied" - never chased, never
+     noticed. So the stamp only counts if the reply is really still there. */
+  var repliedTokens = {}, repliedNames = {};
+  for (var t = 0; t < rows.length; t++) {
+    if (rows[t].invite) repliedTokens[String(rows[t].invite).trim()] = true;
+    repliedNames[norm(rows[t].name)] = true;
+  }
+
   var idata = invitesSheet().getDataRange().getValues();
   var invites = [];
   for (var j = 1; j < idata.length; j++) {
     if (!idata[j][0]) continue;
+    var first = String(idata[j][1] || '').split(',')[0].trim();
+    var reallyReplied = repliedTokens[String(idata[j][0]).trim()] ||
+                        (first && repliedNames[norm(first)]);
     invites.push({
       token:   idata[j][0],
       name:    idata[j][1],
@@ -129,7 +143,8 @@ function doGet(e) {
       seats:   idata[j][3] || 1,
       sent:    idata[j][4] ? new Date(idata[j][4]).toISOString() : '',
       opened:  idata[j][5] ? new Date(idata[j][5]).toISOString() : '',
-      replied: idata[j][6] ? new Date(idata[j][6]).toISOString() : ''
+      replied: (reallyReplied && idata[j][6]) ? new Date(idata[j][6]).toISOString()
+             : (reallyReplied ? new Date().toISOString() : '')
     });
   }
 

@@ -585,6 +585,15 @@ var INVITE_TOKEN = '';
   }catch(e){}
 })();
 
+/* "A and B" for two, "A, B and C" for more - three names joined with "and"
+   twice reads like a mistake. */
+function nameList(names){
+  var n = names.filter(Boolean);
+  if(n.length <= 1) return n[0] || '';
+  if(n.length === 2) return n[0] + ' and ' + n[1];
+  return n.slice(0, -1).join(', ') + ' and ' + n[n.length - 1];
+}
+
 async function greetInvitee(){
   if(!INVITE_TOKEN || ENDPOINT.indexOf('PASTE_') === 0) return;
   try{
@@ -601,6 +610,10 @@ async function greetInvitee(){
         markOpenedOnce();
         return;
       }
+    } else {
+      /* The Sheet has no reply for this invitation, so anything this browser
+         remembers is out of date - forget it and show a clean form. */
+      forgetReply();
     }
 
     /* Everything we already know gets filled in: the person it is addressed to,
@@ -627,7 +640,7 @@ async function greetInvitee(){
     var el = document.getElementById('invited');
     if(el){
       var who = (inv.names && inv.names.length > 1)
-        ? esc(inv.names.join(' and '))
+        ? esc(nameList(inv.names))
         : '<b>' + esc(String(inv.name).split(/\s+/)[0]) + '</b>';
       el.innerHTML = 'Welcome, ' + who + '. Your invitation is recognised' +
         (seats > 1 ? ' — we have you down for ' + seats + '. ' : '. ') +
@@ -658,6 +671,16 @@ function saveReply(p){
     }));
   }catch(e){ /* private mode — the page still works, it just will not remember */ }
 }
+function forgetReply(){
+  try{ localStorage.removeItem(STORE_KEY); }catch(e){}
+  RECOGNISED = null;
+  var ret = document.getElementById('returning');
+  if(ret) ret.hidden = true;
+  form.style.display = '';
+  var fh = document.getElementById('formHead'); if(fh) fh.style.display = '';
+  var recap = document.getElementById('recap'); if(recap) recap.style.display = '';
+}
+
 function readReply(){
   try{ return JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); }catch(e){ return null; }
 }
@@ -1039,7 +1062,14 @@ function esc(s){
 }
 
 /* Last: if this browser already replied, swap the form for the summary. */
-try{ if(!showReturning()) greetInvitee(); }catch(e){}
+/* With an invitation token the Sheet is the authority: this browser's memory
+   can be out of date (a reply that was later deleted), and a phantom "you have
+   already replied" is far worse than being asked twice. Without a token there
+   is nothing to check against, so local memory is all we have. */
+try{
+  if(INVITE_TOKEN) greetInvitee();
+  else showReturning();
+}catch(e){}
 </script>
 </body>
 </html>
