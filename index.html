@@ -261,6 +261,14 @@
     color:var(--cream); background:var(--navy); border:1px solid var(--navy); transition:background .15s;
   }
   .ret-btn:hover{background:var(--navy-deep)}
+  .ret-btns{display:flex; gap:12px; justify-content:center; flex-wrap:wrap}
+  .ret-alt{
+    font-family:var(--serif); font-size:13.5px; font-weight:400; letter-spacing:.24em;
+    text-transform:uppercase; text-indent:.24em; padding:17px 30px; cursor:pointer;
+    color:var(--navy); background:transparent; border:1px solid rgba(27,58,99,.30);
+    transition:border-color .15s, background .15s;
+  }
+  .ret-alt:hover{border-color:var(--navy); background:rgba(27,58,99,.04)}
   .ret-note{font-size:14px; font-style:italic; color:var(--muted); margin:20px auto 0; max-width:44ch; line-height:1.55}
 
   /* the banner that stays put once they choose to amend */
@@ -444,7 +452,10 @@
     <div class="script-accent">Thank you!</div>
     <h3 class="ret-t">Your Reply Is In</h3>
     <div class="ret-detail" id="retDetail"></div>
-    <button type="button" class="ret-btn" onclick="changeMyReply()">Change my reply</button>
+    <div class="ret-btns">
+      <button type="button" class="ret-btn" onclick="changeMyReply()">Change my reply</button>
+      <button type="button" class="ret-alt" onclick="notMe()">This isn&rsquo;t me</button>
+    </div>
     <p class="ret-note">Replying from a different phone or computer? Just fill in the form &mdash;
       we match on your name.</p>
   </div>
@@ -852,6 +863,33 @@ function renderReturning(r, fromLink){
   document.getElementById('formHead').style.display = 'none';
   var recap = document.getElementById('recap'); if(recap) recap.style.display = 'none';
   return true;
+}
+
+/* A shared computer, a forwarded link, a phone handed round at a party: the
+   reply on screen may belong to somebody else entirely. Start completely
+   clean - and drop the invitation token too, because a reply typed by someone
+   who has just said "this isn't me" must not be filed against that family's
+   invitation or overwrite their answer. It lands as an ordinary walk-in. */
+function notMe(){
+  forgetReply();
+  INVITE_TOKEN = '';
+  WHO = []; EXTRAS = 0;
+  AMENDING = false; EXISTING = null; lastLooked = '';
+
+  form.reset();
+  document.getElementById('whoRow').hidden = true;
+  document.getElementById('whoList').innerHTML = '';
+  document.getElementById('namesRow').hidden = true;
+  document.getElementById('nameSlots').innerHTML = '';
+  document.getElementById('amending').hidden = true;
+  var inv = document.getElementById('invited'); if(inv) inv.hidden = true;
+  hideKnown();
+  btn.textContent = 'Send Reply';
+  show('', '');
+  buildSlots();
+
+  nameEl.focus();
+  document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
 }
 
 /* Their own reply, on their own browser — so the name carries over (the update
