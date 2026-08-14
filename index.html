@@ -282,6 +282,35 @@
 
   #namesRow[hidden]{display:none}
   #whoRow[hidden]{display:none}
+  .findme{
+    max-width:var(--w); margin:0 auto 30px; padding:26px 30px 22px; text-align:center;
+    background:#fff; border:1px solid rgba(27,58,99,.14);
+  }
+  .findme[hidden]{display:none}
+  .find-t{font-family:var(--display); font-size:23px; color:var(--navy); line-height:1.25}
+  .find-s{font-size:14.5px; color:var(--muted); font-style:italic; margin:8px auto 16px; max-width:46ch; line-height:1.55}
+  .find-row{display:flex; gap:9px; justify-content:center; flex-wrap:wrap}
+  .find-row input{
+    flex:1 1 260px; max-width:340px; padding:13px 14px; font-family:var(--serif);
+    font-size:16px; color:var(--navy); background:var(--cream);
+    border:1px solid rgba(27,58,99,.22);
+  }
+  .find-row input:focus{outline:none; border-color:var(--navy)}
+  .find-btn{
+    font-family:var(--serif); font-size:12px; letter-spacing:.22em; text-transform:uppercase;
+    text-indent:.22em; padding:13px 26px; cursor:pointer; color:var(--cream);
+    background:var(--navy); border:1px solid var(--navy);
+  }
+  .find-btn:hover{background:var(--navy-deep)}
+  .find-msg{font-size:14px; margin-top:12px; min-height:1px}
+  .find-msg.err{color:var(--red); font-style:italic}
+  .find-msg.ok{color:var(--navy)}
+  .find-skip{
+    display:block; margin:14px auto 0; border:0; background:transparent; cursor:pointer;
+    font-family:var(--serif); font-size:13.5px; font-style:italic; color:var(--muted);
+    text-decoration:underline; text-underline-offset:3px;
+  }
+  .find-skip:hover{color:var(--navy)}
   .who{display:flex; align-items:center; justify-content:space-between; gap:14px;
        padding:11px 0; border-bottom:1px solid rgba(27,58,99,.10)}
   .who:last-child{border-bottom:0}
@@ -460,6 +489,22 @@
       we match on your name.</p>
   </div>
 
+  <!-- For anyone who typed the address in rather than tapping the emailed
+       link. Entirely optional: it saves them retyping what we already know,
+       and a guest we have never emailed just fills the form in as normal. -->
+  <div class="findme" id="findRow" hidden>
+    <div class="find-t">Were you sent an invitation?</div>
+    <div class="find-s">Enter the email address it went to and we&rsquo;ll fill in what we already have &mdash;
+      including your reply, if you have already sent one.</div>
+    <div class="find-row">
+      <input type="email" id="findEmail" placeholder="you@example.com" autocomplete="email"
+             inputmode="email" spellcheck="false">
+      <button type="button" class="find-btn" onclick="findMe()">Find me</button>
+    </div>
+    <div class="find-msg" id="findMsg"></div>
+    <button type="button" class="find-skip" onclick="skipFind()">I&rsquo;ll just fill it in myself</button>
+  </div>
+
   <div class="amending" id="invited" hidden></div>
   <div class="amending" id="amending" hidden></div>
 
@@ -580,6 +625,10 @@ var btn  = document.getElementById('submitBtn');
    not reached yet: pick 2 and a name box appears, whatever they say further
    down. A decline simply sends a party of zero - the boxes are left alone
    rather than yanked away under the cursor. */
+document.getElementById('findEmail').addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){ e.preventDefault(); findMe(); }
+});
+
 document.getElementById('guests').addEventListener('change', function(){
   /* Raising the box on a group invitation means bringing someone additional,
      so remember the difference and keep it as the named answers change. */
@@ -732,64 +781,112 @@ async function greetInvitee(){
   try{
     var d = await fetch(ENDPOINT + '?invite=' + encodeURIComponent(INVITE_TOKEN)).then(function(r){ return r.json(); });
     if(!d || !d.found) return;
-    var inv = d.invite;
-
-    /* Already answered on some other device? Show the reply rather than an
-       empty form, and remember it here so this browser knows it too. */
-    if(d.reply && d.reply.name){
-      saveReply({ name: d.reply.name, attending: d.reply.attending,
-                  guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0 });
-      if(renderReturning(d.reply, true)){
-        markOpenedOnce();
-        return;
-      }
-    } else {
-      /* The Sheet has no reply for this invitation, so anything this browser
-         remembers is out of date - forget it and show a clean form. */
-      forgetReply();
-    }
-
-    /* Everything we already know gets filled in: the person it is addressed to,
-       how many seats we held, and the names of everyone else on the invitation.
-       All of it stays editable — plans change, and an invitation addressed to a
-       couple is often answered by one of them. */
-    if(!nameEl.value && inv.name){
-      nameEl.value = inv.name;
-      lastLooked = String(inv.name).toLowerCase();
-    }
-    /* Several people on one invitation: ask each of them separately. */
-    if(inv.names && inv.names.length > 1) buildWho(inv.names, d.reply);
-
-    var seats = parseInt(inv.seats, 10) || 1;
-    if(seats > 1 && !WHO.length){
-      /* Their seats are filled in, but accept/decline is left blank - holding
-         two seats is not the same as saying yes on their behalf. */
-      var sel = document.getElementById('guests');
-      if([].some.call(sel.options, function(o){ return o.value === String(seats); })) sel.value = String(seats);
-      buildSlots();
-      /* Only when one person holds several seats. On a group invitation each
-         name has its own answer above, so repeating them here would count
-         them twice - including whoever just said they cannot come. */
-      if(!WHO.length){
-        var extra = (inv.names || []).slice(1);
-        [].forEach.call(document.querySelectorAll('#nameSlots input'), function(input, i){
-          if(extra[i]) input.value = extra[i];
-        });
-      }
-    }
-
-    var el = document.getElementById('invited');
-    if(el){
-      var who = (inv.names && inv.names.length > 1)
-        ? esc(nameList(inv.names))
-        : '<b>' + esc(String(inv.name).split(/\s+/)[0]) + '</b>';
-      el.innerHTML = 'Welcome, ' + who + '. Your invitation is recognised' +
-        (seats > 1 ? ' — we have you down for ' + seats + '. ' : '. ') +
-        'Everything below is editable.';
-      el.hidden = false;
-    }
+    applyInvitation(d);
   }catch(e){}
   markOpenedOnce();
+}
+
+/* Everything we know about an invitation, put on the page. Reached two ways:
+   by opening the emailed link, or by typing the address it was sent to. */
+function applyInvitation(d){
+  var inv = d.invite;
+
+  /* Already answered, here or on another device? Show the reply rather than an
+     empty form, and remember it in this browser too. */
+  if(d.reply && d.reply.name){
+    saveReply({ name: d.reply.name, attending: d.reply.attending,
+                guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0 });
+    if(renderReturning(d.reply, true)) return true;
+  } else {
+    /* The Sheet has no reply for this invitation, so anything this browser
+       remembers is out of date - forget it and show a clean form. */
+    forgetReply();
+  }
+
+  /* All of it stays editable - plans change, and an invitation addressed to a
+     couple is often answered by one of them. */
+  if(!nameEl.value && inv.name){
+    nameEl.value = inv.name;
+    lastLooked = String(inv.name).toLowerCase();
+  }
+  /* Several people on one invitation: ask each of them separately. */
+  if(inv.names && inv.names.length > 1) buildWho(inv.names, d.reply);
+
+  var seats = parseInt(inv.seats, 10) || 1;
+  if(seats > 1 && !WHO.length){
+    /* Their seats are filled in, but accept/decline is left blank - holding
+       two seats is not the same as saying yes on their behalf. */
+    var sel = document.getElementById('guests');
+    if([].some.call(sel.options, function(o){ return o.value === String(seats); })) sel.value = String(seats);
+    buildSlots();
+    var extra = (inv.names || []).slice(1);
+    [].forEach.call(document.querySelectorAll('#nameSlots input'), function(input, i){
+      if(extra[i]) input.value = extra[i];
+    });
+  }
+
+  var el = document.getElementById('invited');
+  if(el){
+    var who = (inv.names && inv.names.length > 1)
+      ? esc(nameList(inv.names))
+      : '<b>' + esc(String(inv.name).split(/\s+/)[0]) + '</b>';
+    el.innerHTML = 'Welcome, ' + who + '. Your invitation is recognised' +
+      (seats > 1 ? ' — we have you down for ' + seats + '. ' : '. ') +
+      'Everything below is editable.';
+    el.hidden = false;
+  }
+  return false;
+}
+
+/* ---------------------------------------------------------------------------
+ * Finding yourself by email
+ * Not everybody arrives by tapping the link: the address gets typed in, or the
+ * mail is read on a machine that is not to hand. Rather than present a blank
+ * form and make them retype what we already know, offer the address it was
+ * sent to. It answers only about the one address asked for and never lists
+ * anything, which is the same rule the name lookup follows.
+ * ------------------------------------------------------------------------- */
+function offerFind(){
+  var row = document.getElementById('findRow');
+  if(row) row.hidden = false;
+}
+
+function skipFind(){
+  var row = document.getElementById('findRow');
+  if(row) row.hidden = true;
+  nameEl.focus();
+}
+
+function findMsg(text, kind){
+  var el = document.getElementById('findMsg');
+  el.className = 'find-msg ' + (kind || '');
+  el.textContent = text || '';
+}
+
+async function findMe(){
+  var em = document.getElementById('findEmail').value.trim();
+  if(!em || em.indexOf('@') < 0){ findMsg('Please type the email address the invitation went to.', 'err'); return; }
+  if(ENDPOINT.indexOf('PASTE_') === 0){ skipFind(); return; }
+
+  findMsg('Looking…');
+  try{
+    var d = await fetch(ENDPOINT + '?find=' + encodeURIComponent(em)).then(function(r){ return r.json(); });
+    if(!d || !d.found){
+      /* Never a dead end - plenty of people were invited by someone else, or
+         are answering for a guest who forwarded it on. */
+      findMsg('We could not find that address — no matter, just fill in the form below.', 'err');
+      setTimeout(skipFind, 2200);
+      return;
+    }
+    INVITE_TOKEN = d.invite.token;
+    document.getElementById('findRow').hidden = true;
+    var showedReply = applyInvitation(d);
+    markOpenedOnce();
+    if(!showedReply) document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
+  }catch(e){
+    findMsg('Could not check just now — please fill in the form below.', 'err');
+    setTimeout(skipFind, 2200);
+  }
 }
 
 /* Records that the invitation link was opened. First write wins server-side,
@@ -1248,7 +1345,7 @@ function esc(s){
    is nothing to check against, so local memory is all we have. */
 try{
   if(INVITE_TOKEN) greetInvitee();
-  else showReturning();
+  else if(!showReturning()) offerFind();
 }catch(e){}
 </script>
 </body>

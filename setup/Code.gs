@@ -66,27 +66,18 @@ function doGet(e) {
   if (p.invite) {
     var irow = findInvite(p.invite);
     if (irow < 0) return json({ found: false });
-    var iv = invitesSheet().getRange(irow, 1, 1, IHEADERS.length).getValues()[0];
-    var everyone = String(iv[1] || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
-    /* If this invitation has already been answered, hand the reply back with
-       it. The token is in the link, so a guest opening the email on a second
-       device is recognised there too - browser memory alone cannot do that. */
-    var reply = null;
-    var rrow = findRowByInvite(iv[0]);
-    if (rrow < 0 && everyone[0]) rrow = findRowByName(rsvpSheet(), everyone[0]);
-    if (rrow > 0) {
-      var rv = rsvpSheet().getRange(rrow, 1, 1, HEADERS.length).getValues()[0];
-      reply = { name: rv[1], attending: rv[2], guests: rv[3], photos: rv[4],
-                toast: rv[5], guestNames: rv[6], notComing: rv[8] || '',
-                when: rv[0] ? new Date(rv[0]).toISOString() : '' };
-    }
+    return json(inviteReply(irow));
+  }
 
-    return json({ found: true, reply: reply, invite: {
-      token: iv[0],
-      name:  everyone[0] || '',        // the person the form is filled in as
-      names: everyone,                 // everyone on this invitation
-      seats: parseInt(iv[3], 10) || everyone.length || 1
-    }});
+  /* "I was sent an invitation but I typed the address in." Looks up the one
+     address asked for and answers about that invitation only - same shape as
+     arriving by the link, so the page can treat both identically. Like the
+     name lookup below it is unauthenticated by necessity, so it answers about
+     the single address given and never returns a list. */
+  if (p.find) {
+    var frow = findInviteByEmail(p.find);
+    if (frow < 0) return json({ found: false });
+    return json(inviteReply(frow));
   }
 
   // "Have I already replied?" — unauthenticated by necessity, so it answers
@@ -582,6 +573,33 @@ function findRowByInvite(token) {
     if (String(data[i][7] || '').trim() === String(token).trim()) return i + 1;
   }
   return -1;
+}
+
+/** Everything the page needs about one invitation: who it names, how many
+ *  seats it holds, and the reply if there already is one. */
+function inviteReply(row) {
+  var iv = invitesSheet().getRange(row, 1, 1, IHEADERS.length).getValues()[0];
+  var everyone = String(iv[1] || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+
+  /* If this invitation has already been answered, hand the reply back with it.
+     The token identifies the invitation, so a guest opening it on a second
+     device - or finding themselves by email - is recognised there too. */
+  var reply = null;
+  var rrow = findRowByInvite(iv[0]);
+  if (rrow < 0 && everyone[0]) rrow = findRowByName(rsvpSheet(), everyone[0]);
+  if (rrow > 0) {
+    var rv = rsvpSheet().getRange(rrow, 1, 1, HEADERS.length).getValues()[0];
+    reply = { name: rv[1], attending: rv[2], guests: rv[3], photos: rv[4],
+              toast: rv[5], guestNames: rv[6], notComing: rv[8] || '',
+              when: rv[0] ? new Date(rv[0]).toISOString() : '' };
+  }
+
+  return { found: true, reply: reply, invite: {
+    token: iv[0],
+    name:  everyone[0] || '',        // the person the form is filled in as
+    names: everyone,                 // everyone on this invitation
+    seats: parseInt(iv[3], 10) || everyone.length || 1
+  }};
 }
 
 function findInvite(token) {
