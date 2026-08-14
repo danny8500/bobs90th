@@ -189,7 +189,7 @@ function saveRsvp(p) {
   if (row > 0) sheet.getRange(row, 1, 1, values.length).setValues([values]);
   else         sheet.appendRow(values);
 
-  if (token) stampInvite(token, 7);   // column 7 = Replied
+  if (token || oldToken) stampInvite(token || oldToken, 7);   // column 7 = Replied
   logEvent(row > 0 ? 'Reply changed' : 'Reply', name,
            (attending === 'yes' ? 'Coming, party of ' + guests : 'Not coming') +
            (names ? ' - ' + names : '') +

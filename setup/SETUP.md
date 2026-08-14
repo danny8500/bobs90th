@@ -18,7 +18,7 @@ You open /admin.html  →  Apps Script  →  reads the Sheet  →  the list
 | **Guest link** | <https://bobs90th.com> — put this behind CLICK TO RSVP |
 | **Your RSVP list** | <https://bobs90th.com/admin.html> |
 | **Admin key** | `oreo` |
-| **Spreadsheet** | [Bob's 90th RSVPs](https://docs.google.com/spreadsheets/d/1HuGBOcoVHWQNzgCX98umGW_d4UBkkMCmYcv7GaFWgRA/edit) |
+| **Spreadsheet** | [Bob's 90th RSVPs](https://docs.google.com/spreadsheets/d/1HuGBOcoVHWQNzgCX98umGW_d4UBkkMCmYcv7GaFWgRA/edit) — tabs: RSVPs, Invites, Log |
 | **Photos** | [Bob's 90th — Guest Photos](https://drive.google.com/drive/folders/13iNnfaq5j3TxBaQNCZjtfGo4EljruY9Y) — every guest's photos in this one folder |
 | **Email alerts** | Off. No mail is sent to you per RSVP (it would eat the daily quota) |
 | **Site source** | <https://github.com/danny8500/bobs90th> |
@@ -97,6 +97,27 @@ The email *is* the invitation artwork — the whole picture is the RSVP link. Th
 script fetches it from `bobs90th.com/images/invitation.jpg` at send time, so
 replacing that file changes what gets mailed. If it can't be fetched, the send
 is refused with an error rather than mailing a picture-less invitation.
+
+## The Log tab
+
+Everything that happens is appended to it: each reply and change of reply, each
+edit or deletion you make, who was invited, when an invitation was emailed, and
+each photo. Nothing in the code ever edits or removes a line, so a row deleted
+by accident can be read back out of the Log and retyped. It is yours to clear by
+hand if it ever gets long.
+
+A deletion records what the line said before it went — reply, party, names and
+note — which is the difference between "we lost it" and "we can put it back".
+
+## Several people on one invitation
+
+An invitation naming more than one person (`Tom & Elaine Brady`, or three names
+separated by commas) shows each of them their own **Coming / Can't**. The reply
+records the headcount plus two lists: **Coming** and **Not coming**, so two out
+of three is expressible. The party-size box follows the number coming and can
+still be raised to bring someone additional, who gets a name box of their own.
+
+A one-person invitation is unchanged: one answer, and a party size for a guest.
 
 ## Things worth knowing
 
