@@ -569,7 +569,14 @@ var btn  = document.getElementById('submitBtn');
    not reached yet: pick 2 and a name box appears, whatever they say further
    down. A decline simply sends a party of zero - the boxes are left alone
    rather than yanked away under the cursor. */
-document.getElementById('guests').addEventListener('change', buildSlots);
+document.getElementById('guests').addEventListener('change', function(){
+  /* Raising the box on a group invitation means bringing someone additional,
+     so remember the difference and keep it as the named answers change. */
+  if(WHO.length){
+    EXTRAS = Math.max(0, (parseInt(this.value, 10) || 0) - whoPicked('yes').length);
+  }
+  buildSlots();
+});
 
 /* One box per additional head. Party of 1 asks for nobody; party of 4 asks for
    three names. Existing entries survive a change of count, so bumping 3 to 4
@@ -655,7 +662,7 @@ function nameList(names){
 
 /* Each named person gets a Yes/No of their own. The party-size box below then
    follows the number of yeses, and can still be raised to bring someone else. */
-var WHO = [];
+var WHO = [], EXTRAS = 0;   // named people, and heads added beyond them
 
 function buildWho(names, existingReply){
   WHO = names.slice();
@@ -675,9 +682,7 @@ function buildWho(names, existingReply){
   });
   document.getElementById('whoList').innerHTML = html;
   document.getElementById('whoRow').hidden = false;
-  /* The seats we held are these named people, so the headcount starts level
-     with them - anything above it is a genuinely extra guest. */
-  document.getElementById('guests').dataset.namedYes = String(WHO.length);
+  EXTRAS = 0;   // the seats we held are these named people, not additions
   document.querySelectorAll('#whoList input').forEach(function(r){
     r.addEventListener('change', syncFromWho);
   });
@@ -692,10 +697,8 @@ function syncFromWho(){
   if(!WHO.length) return;
   var yes = whoPicked('yes');
   var sel = document.getElementById('guests');
-  var extras = Math.max(0, (parseInt(sel.value, 10) || 0) - (parseInt(sel.dataset.namedYes || '0', 10)));
-  var want = String(Math.max(1, yes.length + extras));
+  var want = String(Math.max(1, yes.length + EXTRAS));
   if([].some.call(sel.options, function(o){ return o.value === want; })) sel.value = want;
-  sel.dataset.namedYes = String(yes.length);
   buildSlots();
 
   var anyone = yes.length > 0;
@@ -747,7 +750,7 @@ async function greetInvitee(){
     if(inv.names && inv.names.length > 1) buildWho(inv.names, d.reply);
 
     var seats = parseInt(inv.seats, 10) || 1;
-    if(seats > 1){
+    if(seats > 1 && !WHO.length){
       /* Their seats are filled in, but accept/decline is left blank - holding
          two seats is not the same as saying yes on their behalf. */
       var sel = document.getElementById('guests');

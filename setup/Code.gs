@@ -190,6 +190,12 @@ function saveRsvp(p) {
   else         sheet.appendRow(values);
 
   if (token) stampInvite(token, 7);   // column 7 = Replied
+  logEvent(row > 0 ? 'Reply changed' : 'Reply', name,
+           (attending === 'yes' ? 'Coming, party of ' + guests : 'Not coming') +
+           (names ? ' - ' + names : '') +
+           (declined ? ' | not coming: ' + declined : '') +
+           (photos ? ' | ' + photos + ' photo(s)' : '') +
+           (note ? ' | note: ' + String(note).slice(0, 160) : ''), 'guest');
   notify(name, attending, guests, photos, row > 0, note, names);
   return json({ ok: true });
 }
@@ -204,6 +210,7 @@ function savePhoto(p) {
   // listing still groups each person's photos together.
   var blob = Utilities.newBlob(Utilities.base64Decode(m[2]), m[1], safeName(name, p.filename));
   var file = DriveApp.getFolderById(getFolderId()).createFile(blob);
+  logEvent('Photo', name, file.getName(), 'guest');
   return json({ ok: true, file: file.getName() });
 }
 
@@ -243,6 +250,12 @@ function adminUpdate(p) {
   sheet.getRange(row, 1, 1, HEADERS.length)
        .setValues([[new Date(), name, attending, guests, photos, note, names, token, declined]]);
 
+  logEvent('Edited', name,
+           (oldName && oldName !== name ? 'was "' + oldName + '" | ' : '') +
+           (attending === 'yes' ? 'Coming, party of ' + guests : 'Not coming') +
+           (names ? ' - ' + names : '') +
+           (declined ? ' | not coming: ' + declined : ''), 'you');
+
   var renamed = 0;
   if (norm(oldName) !== norm(name)) renamed = renamePhotos(oldName, name);
   return json({ ok: true, renamedPhotos: renamed });
@@ -252,8 +265,17 @@ function adminDelete(p) {
   var sheet = rsvpSheet();
   var row = findRowByName(sheet, p.name);
   if (row < 0) return json({ error: 'Could not find that guest.' });
+  /* Read the line before it goes, so the log can hold everything it said -
+     that is the whole point of a record you cannot delete by accident. */
+  var gone = sheet.getRange(row, 1, 1, HEADERS.length).getValues()[0];
   var trashed = trashPhotos(p.name);
   sheet.deleteRow(row);
+  logEvent('DELETED', gone[1],
+           'was: ' + (gone[2] === 'yes' ? 'coming, party of ' + gone[3] : 'not coming') +
+           (gone[6] ? ' - ' + gone[6] : '') +
+           (gone[8] ? ' | not coming: ' + gone[8] : '') +
+           (gone[5] ? ' | note: ' + String(gone[5]).slice(0, 200) : '') +
+           (trashed ? ' | ' + trashed + ' photo(s) to Drive bin' : ''), 'you');
   return json({ ok: true, trashedPhotos: trashed });
 }
 
@@ -269,8 +291,13 @@ function addInvites(p) {
     var seats = Math.max(1, Math.min(20, parseInt(list[i].seats, 10) || howMany));
     if (!nm || !em) continue;
     var row = findInviteByEmail(em);
-    if (row > 0) { sheet.getRange(row, 2, 1, 3).setValues([[nm, em, seats]]); updated++; }
-    else { sheet.appendRow([newToken(), nm, em, seats, '', '', '']); added++; }
+    if (row > 0) {
+      sheet.getRange(row, 2, 1, 3).setValues([[nm, em, seats]]); updated++;
+      logEvent('Invite updated', nm, em + ' | ' + seats + ' seat(s)', 'you');
+    } else {
+      sheet.appendRow([newToken(), nm, em, seats, '', '', '']); added++;
+      logEvent('Invited', nm, em + ' | ' + seats + ' seat(s)', 'you');
+    }
   }
   return json({ ok: true, added: added, updated: updated });
 }
@@ -317,6 +344,7 @@ function sendInvites(p) {
       };
       MailApp.sendEmail(msg);
       sheet.getRange(i + 1, 5).setValue(new Date());
+      logEvent(wasSent ? 'Invitation resent' : 'Invitation sent', nm, em, 'you');
       sent++;
     } catch (err) { failed++; }
   }
@@ -348,13 +376,17 @@ function sendOne(p) {
     name: "Bob's 90th Birthday"
   });
   invitesSheet().getRange(row, 5).setValue(new Date());
+  logEvent(iv[4] ? 'Invitation resent' : 'Invitation sent', iv[1], em, 'you');
   return json({ ok: true, sent: 1, to: em });
 }
 
 function deleteInvite(p) {
+  var sheet = invitesSheet();
   var row = findInvite(p.token);
   if (row < 0) return json({ error: 'Could not find that invitation.' });
-  invitesSheet().deleteRow(row);
+  var gone = sheet.getRange(row, 1, 1, IHEADERS.length).getValues()[0];
+  sheet.deleteRow(row);
+  logEvent('Invite removed', gone[1], gone[2] + ' | token ' + gone[0], 'you');
   return json({ ok: true });
 }
 
@@ -466,12 +498,52 @@ function rsvpSheet() {
   // Columns are addressed by position, so widen the table in place rather than
   // ever inserting one in the middle.
   if (sheet.getRange(1, 6).getValue() === 'Photo folder') sheet.getRange(1, 6).setValue('Notes');
-  if (sheet.getRange(1, 7).getValue() !== 'Guest names') {
-    sheet.getRange(1, 7, 1, 2).setValues([['Guest names', 'Invite']]).setFontWeight('bold');
+  if (sheet.getRange(1, 7).getValue() === 'Guest names') sheet.getRange(1, 7).setValue('Coming');
+  if (sheet.getRange(1, 7).getValue() !== 'Coming') {
+    sheet.getRange(1, 7, 1, 2).setValues([['Coming', 'Invite']]).setFontWeight('bold');
     sheet.setColumnWidth(6, 340);
     sheet.setColumnWidth(7, 300);
   }
+  if (sheet.getRange(1, 9).getValue() !== 'Not coming') {
+    sheet.getRange(1, 9).setValue('Not coming').setFontWeight('bold');
+    sheet.setColumnWidth(9, 240);
+  }
   return sheet;
+}
+
+/* ---------------------------------------------------------------------------
+ * The log
+ * A plain history of everything that has happened: every reply, every edit,
+ * every deletion, who was invited and when they were emailed. Nothing in this
+ * file ever writes over a line or removes one - it is only ever appended to,
+ * so a row deleted by mistake can still be read back and retyped. It is yours
+ * to clear by hand if it ever gets too long.
+ * ------------------------------------------------------------------------- */
+var LHEADERS = ['When', 'What', 'Who', 'Details', 'By'];
+
+function logSheet() {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sheet = ss.getSheetByName('Log');
+  if (!sheet) {
+    sheet = ss.insertSheet('Log');
+    sheet.appendRow(LHEADERS);
+    sheet.getRange(1, 1, 1, LHEADERS.length).setFontWeight('bold');
+    sheet.setFrozenRows(1);
+    sheet.setColumnWidth(1, 160);
+    sheet.setColumnWidth(2, 150);
+    sheet.setColumnWidth(3, 210);
+    sheet.setColumnWidth(4, 520);
+    sheet.setColumnWidth(5, 90);
+  }
+  return sheet;
+}
+
+/** Append one line. Never throws into the caller - a failed log must not cost
+ *  someone their RSVP. */
+function logEvent(what, who, details, by) {
+  try {
+    logSheet().appendRow([new Date(), what, who || '', details || '', by || 'guest']);
+  } catch (err) { /* the reply matters more than the record of it */ }
 }
 
 function invitesSheet() {
