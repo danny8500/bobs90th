@@ -1,0 +1,4 @@
+# Calendar files are byte-exact on purpose: RFC 5545 requires CRLF line
+# endings, and this repo's checkout settings otherwise rewrite them to LF on
+# commit. Most calendar apps tolerate LF; Apple's has not always.
+*.ics -text
