@@ -216,9 +216,9 @@
   <div id="tabReplies">
 
   <div class="stats">
-    <div class="stat attend"><div class="n" id="sAttending">&mdash;</div><div class="l">Guests attending</div></div>
-    <div class="stat"><div class="n" id="sYes">&mdash;</div><div class="l">Accepted</div></div>
-    <div class="stat declined"><div class="n" id="sNo">&mdash;</div><div class="l">Declined</div></div>
+    <div class="stat attend"><div class="n" id="sAttending">&mdash;</div><div class="l">Guests coming</div></div>
+    <div class="stat declined"><div class="n" id="sNo">&mdash;</div><div class="l">Can&rsquo;t come</div></div>
+    <div class="stat"><div class="n" id="sYes">&mdash;</div><div class="l">Replies in</div></div>
     <div class="stat"><div class="n" id="sPhotos">&mdash;</div><div class="l">Photos sent in</div></div>
   </div>
   <div class="folderline" id="folderline"></div>
@@ -363,17 +363,30 @@ async function load(){
 
 /* "Guests attending" is the number the country club needs — the sum of party
    sizes, not the number of replies. Those are different and it matters. */
+/* These count PEOPLE, not replies. One reply can hold both - a family where two
+   are coming and one is not - so counting rows would report that as a single
+   acceptance and no declines at all, which is what it used to do. */
+function nameCount(s){
+  return String(s || '').split(',').filter(function(x){ return x.trim(); }).length;
+}
+
 function stats(){
-  var yes = ROWS.filter(function(r){ return r.attending === 'yes'; });
+  var yes   = ROWS.filter(function(r){ return r.attending === 'yes'; });
   var heads = yes.reduce(function(n,r){ return n + (parseInt(r.guests,10) || 1); }, 0);
-  var named = yes.reduce(function(n,r){
-    var extra = String(r.guestNames || '').split(',').filter(function(x){ return x.trim(); }).length;
-    return n + 1 + extra;
+
+  /* Everyone who said no, by name. A guest replying only for themself has no
+     "not coming" list to read - the reply itself is the decline, so it counts
+     as the one person it came from. */
+  var cant = ROWS.reduce(function(n,r){
+    var listed = nameCount(r.notComing);
+    if(listed) return n + listed;
+    return n + (r.attending === 'yes' ? 0 : 1);
   }, 0);
-  var pics  = ROWS.reduce(function(n,r){ return n + (parseInt(r.photos,10) || 0); }, 0);
+
+  var pics = ROWS.reduce(function(n,r){ return n + (parseInt(r.photos,10) || 0); }, 0);
   document.getElementById('sAttending').textContent = heads;
-  document.getElementById('sYes').textContent = yes.length;
-  document.getElementById('sNo').textContent = ROWS.length - yes.length;
+  document.getElementById('sNo').textContent = cant;
+  document.getElementById('sYes').textContent = ROWS.length;
   document.getElementById('sPhotos').textContent = pics;
 
   var fl = document.getElementById('folderline');
@@ -391,8 +404,11 @@ function setFilter(f, btn){
 function visible(){
   var q = (document.getElementById('q').value || '').toLowerCase().trim();
   return ROWS.filter(function(r){
-    if(FILTER === 'yes'  && r.attending !== 'yes') return false;
-    if(FILTER === 'no'   && r.attending !== 'no')  return false;
+    if(FILTER === 'yes' && r.attending !== 'yes') return false;
+    /* A reply can decline for somebody while still accepting for others, so
+       "declined" has to mean "somebody on this reply is not coming" - matching
+       on attending alone would hide it from the tab that counts it. */
+    if(FILTER === 'no'  && r.attending === 'yes' && !nameCount(r.notComing)) return false;
     if(q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
@@ -416,9 +432,13 @@ function render(){
       var yes = r.attending === 'yes';
       var n = parseInt(r.photos, 10) || 0;
       var key = encodeURIComponent(r.name);
+      /* A reply that accepts for some and declines for others is neither, and
+         labelling it "Attending" hides the half that is not. */
+      var mixed = yes && nameCount(r.notComing) > 0;
       return '<tr>' +
         '<td><div class="nm">' + esc(r.name) + '</div></td>' +
-        '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' + (yes ? 'Attending' : 'Declined') + '</span></td>' +
+        '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' +
+          (mixed ? 'Some coming' : (yes ? 'Attending' : 'Declined')) + '</span></td>' +
         '<td class="num">' + (yes ? esc(r.guests || '1') : '—') + '</td>' +
         '<td class="bringing">' +
           (r.guestNames ? esc(r.guestNames) : '<span style="color:#A9B3C1">—</span>') +
