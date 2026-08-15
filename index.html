@@ -391,10 +391,17 @@
   .done-detail .r{display:flex; justify-content:space-between; gap:16px; padding:13px 2px; border-bottom:1px solid var(--rule)}
   .done-detail .k{font-size:11.5px; letter-spacing:.22em; text-transform:uppercase; font-weight:400; color:var(--muted); padding-top:5px}
   .done-detail .v{font-family:var(--display); font-size:17px; text-align:right; color:var(--navy); font-variant-numeric:lining-nums}
+  .cal{margin:26px 0 28px}
+  .cal-t{text-align:center; font-size:11.5px; letter-spacing:.22em; text-transform:uppercase;
+    color:var(--muted); margin-bottom:11px}
+  /* Two side by side on anything wider than a small phone, stacked below that -
+     these are the width of a thumb and the labels must not wrap. */
+  .cal-btns{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  @media (max-width:380px){ .cal-btns{grid-template-columns:1fr} }
   .calbtn{
-    display:block; text-align:center; text-decoration:none; margin-top:26px;
+    display:block; text-align:center; text-decoration:none;
     font-size:13px; letter-spacing:.24em; text-transform:uppercase; text-indent:.24em; font-weight:400;
-    color:var(--navy); border:1px solid var(--navy); padding:17px;
+    color:var(--navy); border:1px solid var(--navy); padding:17px 10px;
     transition:background .15s, color .15s;
   }
   .calbtn:hover{background:var(--navy); color:var(--cream)}
@@ -482,6 +489,7 @@
     <div class="script-accent">Thank you!</div>
     <h3 class="ret-t">Your Reply Is In</h3>
     <div class="ret-detail" id="retDetail"></div>
+    <div class="cal" id="calRet"></div>
     <div class="ret-btns">
       <button type="button" class="ret-btn" id="retBtn" onclick="changeMyReply()">Change my reply</button>
       <button type="button" class="ret-alt" onclick="notMe()">This isn&rsquo;t me</button>
@@ -593,7 +601,7 @@
     <h2 class="done-title" id="doneTitle">We Will See You There</h2>
     <p class="done-sub" id="doneSub"></p>
     <div class="done-detail" id="doneDetail"></div>
-    <a class="calbtn" id="calLink" href="#" download="bobs-90th.ics">Add to your calendar</a>
+    <div class="cal" id="calDone"></div>
     <p class="again">Need to change your reply? <a href="#" onclick="restart(event)">Send it again</a></p>
   </div>
 
@@ -1160,6 +1168,10 @@ function renderReturning(r, fromLink){
   if(when) rows += '<div class="r"><span class="k">Sent</span><span class="v">' + esc(when) + '</span></div>';
   document.getElementById('retDetail').innerHTML = rows;
 
+  /* Anyone on this reply who is coming still needs the date in their calendar,
+     however many visits later they open the link. */
+  showCalendar(document.getElementById('calRet'), yes || going.length > 0);
+
   /* When somebody on the invitation has still not answered, the useful button
      is not "change what I said" - it is "let me answer for them". */
   var outstanding = FROM_INVITE && (going.length || cant.length) && WHO.some(function(n){
@@ -1553,8 +1565,7 @@ function confirmed(p){
           + '<div class="r"><span class="k">Where</span><span class="v">Virginia Country Club, Long Beach</span></div>';
   }
   document.getElementById('doneDetail').innerHTML = rows;
-  document.getElementById('calLink').style.display = yes ? '' : 'none';
-  if(yes) document.getElementById('calLink').href = calendarFile();
+  showCalendar(document.getElementById('calDone'), yes);
   /* The reply is in, so the instructions for changing it have served their
      purpose - leaving them above the confirmation just reads as unfinished. */
   document.getElementById('amending').hidden = true;
@@ -1579,19 +1590,44 @@ function restart(e){
   document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
 }
 
-/* .ics built in the page — no library, no network. Floating local times, so no
-   timezone table is needed and it reads as 5pm wherever the guest opens it. */
-function calendarFile(){
-  var ics = [
-    'BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Bob 90//EN','CALSCALE:GREGORIAN','BEGIN:VEVENT',
-    'UID:bob90-2026-10-17@birthday','DTSTAMP:20260812T000000Z',
-    'DTSTART:20261017T170000','DTEND:20261017T220000',
-    "SUMMARY:Bob's 90th Birthday",
-    'LOCATION:Virginia Country Club\\, 500 Virginia Country Club Road\\, Long Beach\\, CA 90807',
-    'DESCRIPTION:Cocktails at 5:00 PM\\nDinner at 6:30 PM\\nNinety years well played.',
-    'END:VEVENT','END:VCALENDAR'
-  ].join('\r\n');
-  return 'data:text/calendar;charset=utf-8,' + encodeURIComponent(ics);
+/* ---------------------------------------------------------------------------
+ * Add to calendar
+ * Two links rather than one file. The .ics used to be built in the page as a
+ * data: URI, which phones treat as a download - iOS in particular hands over a
+ * file the guest then has to find and open. A real file served from the site is
+ * opened straight by the Calendar app on iOS and by the calendar chooser on
+ * Android, and Google Calendar users get a prefilled event with no file at all.
+ *
+ * Times are deliberately floating (no timezone): everybody is being asked to a
+ * room in Long Beach, and it should read 5pm on every phone in that room.
+ * ------------------------------------------------------------------------- */
+var CAL_ICS = 'bobs-90th.ics';
+
+function googleCalUrl(){
+  var q = {
+    action:  'TEMPLATE',
+    text:    "Bob's 90th Birthday",
+    dates:   '20261017T170000/20261017T220000',
+    location:'Virginia Country Club, 500 Virginia Country Club Road, Long Beach, CA 90807',
+    details: 'Cocktails at 5:00 PM\nDinner at 6:30 PM\nNinety years well played.'
+  };
+  return 'https://calendar.google.com/calendar/render?' +
+    Object.keys(q).map(function(k){ return k + '=' + encodeURIComponent(q[k]); }).join('&');
+}
+
+/* Filled into whichever panel is on screen, so the link is there the first time
+   and every time afterwards - it used to exist only on the just-replied screen
+   and vanished on the next visit. */
+function showCalendar(el, coming){
+  if(!el) return;
+  if(!coming){ el.innerHTML = ''; el.hidden = true; return; }
+  el.innerHTML =
+    '<div class="cal-t">Add it to your calendar</div>' +
+    '<div class="cal-btns">' +
+      '<a class="calbtn" href="' + CAL_ICS + '">Apple &middot; Outlook</a>' +
+      '<a class="calbtn" href="' + esc(googleCalUrl()) + '" target="_blank" rel="noopener">Google</a>' +
+    '</div>';
+  el.hidden = false;
 }
 
 function esc(s){
