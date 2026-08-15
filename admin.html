@@ -102,6 +102,9 @@
   .mini.del{color:var(--red)} .mini.del:hover{border-color:var(--red)}
   .mini.send{color:var(--green); border-color:rgba(31,107,63,.35)} .mini.send:hover{border-color:var(--green)}
   .declined{margin-top:3px; font-size:11.5px; color:var(--red); font-style:italic}
+  /* Which reply a person arrived on. Only shown when it is somebody else's,
+     since that is also what the Edit and Delete buttons act on. */
+  .sub{margin-top:2px; font-size:11.5px; color:#8A93A3; font-style:italic}
   table.entry{width:100%; border-collapse:collapse; margin-bottom:10px}
   table.entry th{
     text-align:left; padding:0 0 7px; font-family:var(--serif); font-size:11px;
@@ -221,13 +224,14 @@
     <div class="stat"><div class="n" id="sYes">&mdash;</div><div class="l">Replies in</div></div>
     <div class="stat"><div class="n" id="sPhotos">&mdash;</div><div class="l">Photos sent in</div></div>
   </div>
+  <div class="folderline" id="headGap"></div>
   <div class="folderline" id="folderline"></div>
 
   <div class="bar">
     <div class="seg" id="seg">
       <button class="on" data-f="all"  onclick="setFilter('all',this)">All</button>
-      <button          data-f="yes"  onclick="setFilter('yes',this)">Attending</button>
-      <button          data-f="no"   onclick="setFilter('no',this)">Declined</button>
+      <button          data-f="yes"  onclick="setFilter('yes',this)">Coming</button>
+      <button          data-f="no"   onclick="setFilter('no',this)">Can&rsquo;t come</button>
     </div>
     <input type="search" id="q" placeholder="Search by name&hellip;" oninput="render()">
   </div>
@@ -363,31 +367,32 @@ async function load(){
 
 /* "Guests attending" is the number the country club needs — the sum of party
    sizes, not the number of replies. Those are different and it matters. */
-/* These count PEOPLE, not replies. One reply can hold both - a family where two
-   are coming and one is not - so counting rows would report that as a single
-   acceptance and no declines at all, which is what it used to do. */
-function nameCount(s){
-  return String(s || '').split(',').filter(function(x){ return x.trim(); }).length;
-}
-
+/* Counted off the same person list the table is built from, so a total can
+   never disagree with the names sitting underneath it. */
 function stats(){
-  var yes   = ROWS.filter(function(r){ return r.attending === 'yes'; });
-  var heads = yes.reduce(function(n,r){ return n + (parseInt(r.guests,10) || 1); }, 0);
+  var all   = guestList();
+  var heads = all.filter(function(g){ return g.coming; }).length;
+  var cant  = all.length - heads;
 
-  /* Everyone who said no, by name. A guest replying only for themself has no
-     "not coming" list to read - the reply itself is the decline, so it counts
-     as the one person it came from. */
-  var cant = ROWS.reduce(function(n,r){
-    var listed = nameCount(r.notComing);
-    if(listed) return n + listed;
-    return n + (r.attending === 'yes' ? 0 : 1);
+  /* The party size a guest gave is what the club is catering for. It should
+     equal the names on the reply - the form asks for every one of them - so if
+     it does not, say so rather than quietly reporting the smaller number. */
+  var stated = ROWS.reduce(function(n,r){
+    return n + (r.attending === 'yes' ? (parseInt(r.guests,10) || 1) : 0);
   }, 0);
 
   var pics = ROWS.reduce(function(n,r){ return n + (parseInt(r.photos,10) || 0); }, 0);
-  document.getElementById('sAttending').textContent = heads;
+  document.getElementById('sAttending').textContent =
+    stated > heads ? heads + ' of ' + stated : heads;
   document.getElementById('sNo').textContent = cant;
   document.getElementById('sYes').textContent = ROWS.length;
   document.getElementById('sPhotos').textContent = pics;
+  var gap = document.getElementById('headGap');
+  if(gap){
+    gap.textContent = stated > heads
+      ? (stated - heads) + ' guest(s) counted in a party size but not named — open that reply and add them.'
+      : '';
+  }
 
   var fl = document.getElementById('folderline');
   fl.innerHTML = FOLDER_URL
@@ -401,56 +406,88 @@ function setFilter(f, btn){
   render();
 }
 
+function norm(s){ return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
+
+function splitNames(s){
+  return String(s || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+}
+
+/* One entry per PERSON. A reply is the envelope several people can arrive in -
+   it is not itself a guest, and letting the name it was submitted under stand
+   for the whole party buries everybody else on it. */
+function guestList(){
+  var out = [];
+  ROWS.forEach(function(r){
+    var coming = splitNames(r.guestNames);
+    var cant   = splitNames(r.notComing);
+    /* Somebody replying only for themself is named nowhere but the reply, so
+       take their answer from the reply itself. When the reply does name them,
+       it has already said which side they are on. */
+    var named = {};
+    coming.concat(cant).forEach(function(n){ named[norm(n)] = true; });
+    if(!named[norm(r.name)]) (r.attending === 'yes' ? coming : cant).unshift(r.name);
+
+    var group = [];
+    coming.forEach(function(n){ group.push({ name: n, coming: true,  reply: r }); });
+    cant.forEach(  function(n){ group.push({ name: n, coming: false, reply: r }); });
+
+    /* The person the reply is filed under leads their own group: the note, the
+       photos and the Edit/Delete buttons belong to the reply, and hanging them
+       off whoever happened to sort first reads as though they were that
+       person's. */
+    group.sort(function(a, b){
+      return (norm(b.name) === norm(r.name)) - (norm(a.name) === norm(r.name));
+    });
+    out = out.concat(group);
+  });
+  return out;
+}
+
 function visible(){
   var q = (document.getElementById('q').value || '').toLowerCase().trim();
-  return ROWS.filter(function(r){
-    if(FILTER === 'yes' && r.attending !== 'yes') return false;
-    /* A reply can decline for somebody while still accepting for others, so
-       "declined" has to mean "somebody on this reply is not coming" - matching
-       on attending alone would hide it from the tab that counts it. */
-    if(FILTER === 'no'  && r.attending === 'yes' && !nameCount(r.notComing)) return false;
-    if(q && String(r.name || '').toLowerCase().indexOf(q) < 0) return false;
+  return guestList().filter(function(g){
+    if(FILTER === 'yes' && !g.coming) return false;
+    if(FILTER === 'no'  &&  g.coming) return false;
+    if(q && g.name.toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
 }
 
 function render(){
-  var rows = visible(), el = document.getElementById('list');
-  if(!rows.length){
+  var people = visible(), el = document.getElementById('list');
+  if(!people.length){
     el.innerHTML = '<div class="empty">' +
-      (ROWS.length ? 'No replies match that filter.' : 'No replies yet. They will appear here as guests respond.') +
+      (ROWS.length ? 'Nobody matches that filter.' : 'No replies yet. They will appear here as guests respond.') +
       '</div>';
     return;
   }
+  /* The note, the photos, when it arrived and the Edit/Delete buttons belong to
+     the reply rather than to each person on it, so they are shown once - against
+     the first person from that reply still on screen. */
+  var seen = {}, dash = '<span style="color:#A9B3C1">—</span>';
   el.innerHTML =
     '<table><thead><tr>' +
-      '<th>Guest</th><th>Reply</th><th style="text-align:center">Party</th>' +
-      '<th>Coming</th><th style="text-align:center">Photos</th>' +
+      '<th>Name</th><th>Reply</th><th style="text-align:center">Photos</th>' +
       '<th class="note-h">Notes</th><th class="when-h">Received</th><th></th>' +
     '</tr></thead><tbody>' +
-    rows.map(function(r){
-      var yes = r.attending === 'yes';
+    people.map(function(g){
+      var r = g.reply, key = encodeURIComponent(r.name);
+      var lead = !seen[r.name]; seen[r.name] = true;
       var n = parseInt(r.photos, 10) || 0;
-      var key = encodeURIComponent(r.name);
-      /* A reply that accepts for some and declines for others is neither, and
-         labelling it "Attending" hides the half that is not. */
-      var mixed = yes && nameCount(r.notComing) > 0;
       return '<tr>' +
-        '<td><div class="nm">' + esc(r.name) + '</div></td>' +
-        '<td><span class="pill ' + (yes ? 'yes' : 'no') + '">' +
-          (mixed ? 'Some coming' : (yes ? 'Attending' : 'Declined')) + '</span></td>' +
-        '<td class="num">' + (yes ? esc(r.guests || '1') : '—') + '</td>' +
-        '<td class="bringing">' +
-          (r.guestNames ? esc(r.guestNames) : '<span style="color:#A9B3C1">—</span>') +
-          (r.notComing ? '<div class="declined">can’t: ' + esc(r.notComing) + '</div>' : '') +
+        '<td><div class="nm">' + esc(g.name) + '</div>' +
+          (norm(g.name) !== norm(r.name)
+            ? '<div class="sub">on ' + esc(r.name) + '&rsquo;s reply</div>' : '') +
         '</td>' +
-        '<td class="num">' + (n ? n : '<span style="color:#A9B3C1">—</span>') + '</td>' +
-        '<td class="note">' + (r.toast ? esc(r.toast) : '<span style="color:#A9B3C1">—</span>') + '</td>' +
-        '<td class="when-col">' + esc(fmt(r.timestamp)) + '</td>' +
-        '<td class="acts">' +
-          '<button class="mini" data-act="edit" data-n="' + key + '">Edit</button>' +
-          '<button class="mini del" data-act="del" data-n="' + key + '">Delete</button>' +
-        '</td>' +
+        '<td><span class="pill ' + (g.coming ? 'yes' : 'no') + '">' +
+          (g.coming ? 'Coming' : 'Can&rsquo;t come') + '</span></td>' +
+        '<td class="num">' + (lead && n ? n : dash) + '</td>' +
+        '<td class="note">' + (lead && r.toast ? esc(r.toast) : dash) + '</td>' +
+        '<td class="when-col">' + (lead ? esc(fmt(r.timestamp)) : '') + '</td>' +
+        '<td class="acts">' + (lead
+          ? '<button class="mini" data-act="edit" data-n="' + key + '">Edit</button>' +
+            '<button class="mini del" data-act="del" data-n="' + key + '">Delete</button>'
+          : '') + '</td>' +
       '</tr>';
     }).join('') +
     '</tbody></table>';
@@ -466,13 +503,16 @@ function fmt(ts){
 /* Export what you are LOOKING at, not the whole table — if you filtered to
    attending guests, that is the list you want to hand the country club. */
 function exportCsv(){
-  var rows = visible();
-  if(!rows.length){ alert('Nothing to export.'); return; }
-  var head = ['Name','Attending','Party size','Coming','Not coming','Photos','Notes','Received'];
-  var body = rows.map(function(r){
-    return [r.name, r.attending === 'yes' ? 'Yes' : 'No',
-            r.attending === 'yes' ? (r.guests || '1') : '0',
-            r.guestNames || '', r.notComing || '', parseInt(r.photos, 10) || 0, r.toast || '', fmt(r.timestamp)];
+  var people = visible();
+  if(!people.length){ alert('Nothing to export.'); return; }
+  /* One line per person, which is what a caterer or a place-card printer wants
+     - a party of four should arrive as four names, not one row to unpack. */
+  var head = ['Name','Coming','Replied on','Notes','Received'];
+  var body = people.map(function(g){
+    var r = g.reply;
+    return [g.name, g.coming ? 'Yes' : 'No',
+            norm(g.name) === norm(r.name) ? 'own reply' : r.name + "'s reply",
+            r.toast || '', fmt(r.timestamp)];
   });
   var csv = [head].concat(body).map(function(cols){
     return cols.map(function(c){ return '"' + String(c == null ? '' : c).replace(/"/g,'""') + '"'; }).join(',');
