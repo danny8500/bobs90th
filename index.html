@@ -115,10 +115,23 @@
   }
   .hero h1 em{font-style:italic; color:var(--gold); letter-spacing:0}
   .hero h1 .th{font-size:.44em; vertical-align:.62em; letter-spacing:.02em; margin-left:.03em}
+  /* Italianno swashes reach well past the glyph's advance width, and the flex
+     column sizes this box to that width - so the tail of a final letter sits
+     outside it. Safari on iOS turned `opacity` into a compositing layer and
+     rasterised to the box, taking the d of "played" off with it; the alpha is
+     baked into the colour instead. The padding and the roomier line box keep
+     the swash inside the element on every browser rather than relying on
+     overflow being visible. */
   .tagline{
-    font-family:var(--script); color:var(--navy); opacity:.94;
-    font-size:clamp(44px,8vw,78px); line-height:1; margin:14px 0 0;
+    font-family:var(--script); color:rgba(27,58,99,.94);
+    font-size:clamp(44px,8vw,78px); line-height:1.24; margin:6px 0 0;
+    padding:0 .4em .06em; overflow:visible;
   }
+  /* The phrase is one line or it is nothing - broken across two it stops
+     reading as a flourish. On the narrowest phones still around (320px) the
+     line plus its swash allowance is wider than the page, so drop a few points
+     rather than let it wrap. */
+  @media(max-width:360px){ .tagline{font-size:36px} }
   .whenline{
     margin:40px 0 0; font-family:var(--serif); font-weight:400; font-size:15px;
     letter-spacing:.26em; text-transform:uppercase; text-indent:.26em; color:var(--navy);
@@ -384,7 +397,10 @@
   #done{display:none}
   #done.show{display:block; animation:fade .45s ease}
   @keyframes fade{from{opacity:0; transform:translateY(10px)}to{opacity:1; transform:none}}
-  .script-accent{font-family:var(--script); font-size:76px; color:var(--gold); text-align:center; line-height:.9; margin:0}
+  /* Same swash allowance as the tagline - "Wonderful!" and "Thank you!" are set
+     in the same face, and a line box tight enough to crop them is the bug we
+     just fixed above. */
+  .script-accent{font-family:var(--script); font-size:76px; color:var(--gold); text-align:center; line-height:1.16; margin:0; padding:0 .3em}
   .done-title{font-family:var(--display); font-weight:400; font-size:clamp(31px,5.2vw,44px); text-align:center; color:var(--navy); margin:14px 0 10px}
   .done-sub{text-align:center; font-size:17.5px; font-style:italic; color:var(--muted); margin:0 auto 34px; max-width:46ch}
   .done-detail{border-top:1px solid var(--rule); margin:0 0 6px}
@@ -410,7 +426,7 @@
 
   /* ======================= FOOTER ======================= */
   .foot{background:var(--navy-ink); color:#8FA0B8; text-align:center; padding:54px 24px 58px; font-size:15px; font-style:italic; line-height:1.7}
-  .foot .fx{font-family:var(--script); font-size:52px; color:var(--gold-lt); font-style:normal; margin-bottom:8px; line-height:1}
+  .foot .fx{font-family:var(--script); font-size:52px; color:var(--gold-lt); font-style:normal; margin-bottom:8px; line-height:1.2; padding:0 .45em}
   .foot a{color:#C6D0DF}
 </style>
 </head>
@@ -1598,8 +1614,10 @@ function restart(e){
  * opened straight by the Calendar app on iOS and by the calendar chooser on
  * Android, and Google Calendar users get a prefilled event with no file at all.
  *
- * Times are deliberately floating (no timezone): everybody is being asked to a
- * room in Long Beach, and it should read 5pm on every phone in that room.
+ * The event is 5pm Pacific, and it is pinned to that. A guest opening this from
+ * another timezone gets their own correct local time instead of a bare "5pm"
+ * that would have them arrive hours out. The .ics carries the same instant as
+ * UTC; here Google is given the local time plus the zone to read it in.
  * ------------------------------------------------------------------------- */
 var CAL_ICS = 'bobs-90th.ics';
 
@@ -1608,6 +1626,7 @@ function googleCalUrl(){
     action:  'TEMPLATE',
     text:    "Bob's 90th Birthday",
     dates:   '20261017T170000/20261017T220000',
+    ctz:     'America/Los_Angeles',
     location:'Virginia Country Club, 500 Virginia Country Club Road, Long Beach, CA 90807',
     details: 'Cocktails at 5:00 PM\nDinner at 6:30 PM\nNinety years well played.'
   };

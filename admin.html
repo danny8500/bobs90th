@@ -166,6 +166,10 @@
     background:var(--cream-2); border:1px solid var(--rule); border-radius:2px; padding:10px 12px; outline:none; resize:vertical}
   .inv-add textarea:focus{border-color:var(--gold)}
   .inv-btns{display:flex; gap:8px; flex-wrap:wrap; margin-top:12px}
+  /* The CSV rules, next to the button that needs them - a template that has to
+     be explained somewhere else is a template nobody uses correctly. */
+  .csv-note{margin:12px 0 0; font-size:13.5px; line-height:1.6; color:#5A6880; max-width:760px}
+  .csv-note b{font-weight:600; color:var(--navy)}
   .inv-msg{font-size:15px; margin-top:12px; min-height:20px; font-style:italic; color:var(--muted)}
   .inv-msg.ok{font-size:15.5px}
   tr.justadded td{background:#F3EBD3 !important; transition:background 1.2s ease}
@@ -255,7 +259,7 @@
           <tr>
             <th>Who is invited <span class="hint">&mdash; join people on one invitation with &amp;</span></th>
             <th>Email addresses <span class="hint">&mdash; separate with commas, all get the same invitation</span></th>
-            <th class="seatcol">Seats</th>
+            <th class="seatcol">Seats <span class="hint">&mdash; blank counts the names</span></th>
             <th></th>
           </tr>
         </thead>
@@ -263,12 +267,22 @@
       </table>
       <button class="btn thin" onclick="addEntryRow(true)">+ Another invitation</button>
       <div class="inv-btns">
+        <button class="btn" onclick="csvTemplate()">Download a CSV template</button>
         <label class="btn" for="csvFile" style="cursor:pointer">Import a CSV&hellip;</label>
         <input type="file" id="csvFile" accept=".csv,text/csv,text/plain" style="position:absolute;width:1px;height:1px;opacity:0">
         <button class="btn" onclick="addInvites()">Add to list</button>
         <button class="btn solid" onclick="sendInvites('unsent')">Send to everyone not yet emailed</button>
         <button class="btn" onclick="sendInvites('noreply')">Remind those who haven't replied</button>
       </div>
+      <p class="csv-note">A CSV can stay one person per line &mdash;
+        <b>Group</b>, <b>Name</b>, <b>Email</b>. Give everyone in a household the same
+        Group (any number or word) and they become one invitation sharing one link;
+        leave it blank and they get their own. Somebody in a group does not need an
+        address of their own. A <b>Seats</b> column is only for holding places for people
+        you have not named &mdash; otherwise the names are counted for you.
+        You can still put a whole household on one line instead, joined with
+        <b>&amp;</b> or <b>and</b>.
+      </p>
       <div class="inv-msg" id="invMsg"></div>
     </div>
 
@@ -521,6 +535,32 @@ function exportCsv(){
   var a = document.createElement('a');
   a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
   a.download = 'bobs-90th-rsvps.csv';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+/* A filled-in example rather than a paragraph of rules: open it in Excel or
+   Sheets, replace the rows, import it back. One person per line with the group
+   leading, because that is the shape a guest list is actually kept in and the
+   column you sort by belongs on the left - and every case worth explaining
+   appears once: somebody on their own, a couple sharing a group, a household
+   with one address between them, and a single name holding seats for people who
+   are not listed. Column order does not matter to the importer; it reads the
+   header. */
+function csvTemplate(){
+  var csv = [
+    'Group,Name,Email,Seats',
+    ',Jana Lubert,jana@example.com,',
+    '1,Tom Brady,tom@example.com,',
+    '1,Elaine Brady,elaine@example.com,',
+    '2,Charlie Bricker,bricker@example.com,',
+    '2,Dena Bricker,,',
+    ',Roy Brisbois,roy@example.com,4'
+  ].join('\r\n') + '\r\n';
+
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'bob90-invite-template.csv';
   a.click();
   URL.revokeObjectURL(a.href);
 }
@@ -915,7 +955,7 @@ function parseCsv(text){
 }
 
 var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-var SPLIT_PEOPLE = /\s*(?:&|and|\+)\s*/i;
+var SPLIT_PEOPLE = /\s*(?:&|\band\b|\+)\s*/i;
 
 function csvToLines(rows){
   if(!rows.length) return { lines: [], skipped: 0 };
@@ -925,7 +965,7 @@ function csvToLines(rows){
      email and treating everything else as the name. */
   var head = rows[0].map(function(h){ return h.toLowerCase(); });
   var hasHeader = !rows[0].some(function(c){ return EMAIL_RE.test(c); });
-  var iEmail = -1, iName = -1, iFirst = -1, iLast = -1, iSeats = -1;
+  var iEmail = -1, iName = -1, iFirst = -1, iLast = -1, iSeats = -1, iGroup = -1;
 
   if(hasHeader){
     head.forEach(function(h, i){
@@ -933,38 +973,98 @@ function csvToLines(rows){
       if(iFirst < 0 && /first/.test(h)) iFirst = i;
       if(iLast  < 0 && /last|surname/.test(h)) iLast = i;
       if(iName  < 0 && /^name|full ?name|guest|invite/.test(h)) iName = i;
-      if(iSeats < 0 && /seat|guests?|party|count|#/.test(h)) iSeats = i;
+      /* Checked before seats: "party" reads as a household here, and a list
+         kept one-person-per-line has no use for a seat count anyway. */
+      if(iGroup < 0 && /group|household|family|party/.test(h)) iGroup = i;
+      if(iSeats < 0 && i !== iGroup && /seat|guests?|count|#/.test(h)) iSeats = i;
     });
     rows = rows.slice(1);
   }
 
+  /* Addresses in one cell. A spreadsheet exporting "a@x.com, b@y.com" quotes
+     it into a single field, so testing the whole cell finds no address at all
+     and the row used to be dropped without a word. Split first, then test. */
+  function cellEmails(cell){
+    var out = [];
+    String(cell == null ? '' : cell).split(/[,;\s]+/).forEach(function(x){
+      x = x.trim();
+      if(x && EMAIL_RE.test(x)) out.push(x);
+    });
+    return out;
+  }
+
   var lines = [], skipped = 0;
   rows.forEach(function(r){
-    var email = iEmail >= 0 ? r[iEmail] : '';
-    if(!EMAIL_RE.test(email)){
-      email = '';
-      for(var i = 0; i < r.length; i++){ if(EMAIL_RE.test(r[i])){ email = r[i]; break; } }
-    }
-    if(!email){ skipped++; return; }
+    /* Every address on the row, not just the first - a household may list two
+       or three, and they all belong to the same invitation. The column the
+       header pointed at goes first so it stays the one we write to. */
+    var emails = [];
+    function add(list){ list.forEach(function(x){ if(emails.indexOf(x) < 0) emails.push(x); }); }
+    if(iEmail >= 0) add(cellEmails(r[iEmail]));
+    r.forEach(function(c){ add(cellEmails(c)); });
+
+    var group = iGroup >= 0 ? String(r[iGroup] || '').trim() : '';
+    /* Somebody in a household does not need an address of their own - the
+       invitation reaches them through whoever on it has one. Without a group
+       there is nothing to attach them to, so that row really is unusable. */
+    if(!emails.length && !group){ skipped++; return; }
 
     var name = '';
     if(iFirst >= 0 || iLast >= 0) name = [r[iFirst] || '', r[iLast] || ''].join(' ').trim();
     else if(iName >= 0) name = r[iName] || '';
     if(!name){
-      name = r.filter(function(c){ return c && !EMAIL_RE.test(c) && !/^\d+$/.test(c); }).join(' ').trim();
+      name = r.filter(function(c){ return c && !cellEmails(c).length && !/^\d+$/.test(c); }).join(' ').trim();
     }
-    if(!name) name = email.split('@')[0];
-
-    /* Every address on the row, not just the first - a household may list two
-       or three, and they all belong to the same invitation. */
-    var emails = r.filter(function(c){ return EMAIL_RE.test(String(c).trim()); })
-                  .map(function(c){ return String(c).trim(); });
-    if(!emails.length) emails = [email];
+    if(!name && emails.length) name = emails[0].split('@')[0];
+    if(!name){ skipped++; return; }          // no name and no address is an empty row
 
     var seats = iSeats >= 0 ? parseInt(r[iSeats], 10) : 0;
-    lines.push({ names: name, emails: emails.join(', '), seats: seats > 1 ? seats : '' });
+    lines.push({ names: name, emails: emails.join(', '), seats: seats > 1 ? seats : '', group: group });
   });
-  return { lines: lines, skipped: skipped };
+
+  /* A whole group with no address between them cannot be invited, and that is
+     only knowable once the group has been assembled. */
+  var merged = mergeGroups(lines).filter(function(l){
+    if(l.emails) return true;
+    skipped++;
+    return false;
+  });
+  return { lines: merged, skipped: skipped };
+}
+
+/* Rows that share a group number become one invitation.
+   A list kept one person per line is far easier to maintain than one where a
+   household has to be crammed into a single cell, so the joining happens here
+   instead of by hand:
+
+       Tom Brady,tom@x.com,1        ->  Tom Brady & Elaine Brady
+       Elaine Brady,elaine@x.com,1      tom@x.com, elaine@x.com
+
+   A blank group is not a group. Those rows stay one invitation each - merging
+   every ungrouped person into a single enormous invitation is the one mistake
+   here that would be a nuisance to unpick. */
+function mergeGroups(lines){
+  var first = {}, out = [];
+  lines.forEach(function(l){
+    var key = (l.group || '').toLowerCase();
+    if(!key){ out.push(l); return; }
+    if(!first[key]){ first[key] = l; out.push(l); return; }
+
+    var g = first[key];
+    g.names = [g.names, l.names].filter(Boolean).join(' & ');
+
+    var seen = {}, addrs = [];
+    (g.emails + ', ' + l.emails).split(/[,;]+/).forEach(function(x){
+      x = x.trim();
+      if(x && !seen[x.toLowerCase()]){ seen[x.toLowerCase()] = true; addrs.push(x); }
+    });
+    g.emails = addrs.join(', ');
+
+    /* Seats given anywhere in the group applies to the whole invitation - it is
+       holding places for people who are not listed by name. */
+    if((parseInt(l.seats, 10) || 0) > (parseInt(g.seats, 10) || 0)) g.seats = l.seats;
+  });
+  return out;
 }
 
 addEntryRow(false);   // the grid always offers one empty line
