@@ -310,6 +310,20 @@
       color:var(--navy); background:#fff; transition:background .15s, color .15s, border-color .15s}
   .who-pick input:checked + span{background:var(--navy); color:var(--cream); border-color:var(--navy)}
   .who-pick .no input:checked + span{background:#7a2f2f; border-color:#7a2f2f}
+  /* An answer already recorded. Shown as a statement rather than a control, so
+     a second person replying for the rest of the family cannot casually undo
+     it — "Change" is the deliberate step that hands the buttons back. */
+  .who.locked .who-n{color:var(--muted)}
+  .who-said{display:flex; align-items:center; gap:10px; flex:0 0 auto}
+  .who-said .pill{padding:7px 16px; font-family:var(--serif); font-size:12px;
+      letter-spacing:.16em; text-transform:uppercase; border:1px solid transparent}
+  .who-said .pill.y{background:var(--navy); color:var(--cream)}
+  .who-said .pill.n{background:#7a2f2f; color:var(--cream)}
+  .who-chg{background:none; border:0; padding:0; cursor:pointer; font-family:var(--serif);
+      font-size:11.5px; letter-spacing:.14em; text-transform:uppercase; color:var(--muted);
+      text-decoration:underline; text-underline-offset:3px}
+  .who-chg:hover{color:var(--navy)}
+  .who-todo{margin:10px 0 0; font-size:14.5px; font-style:italic; color:var(--muted)}
   .slot{display:flex; align-items:center; gap:12px; margin-bottom:9px}
   .slot .n{flex:none; width:74px; font-size:11.5px; letter-spacing:.16em; text-transform:uppercase; color:var(--muted)}
   .slot input{flex:1}
@@ -469,7 +483,7 @@
     <h3 class="ret-t">Your Reply Is In</h3>
     <div class="ret-detail" id="retDetail"></div>
     <div class="ret-btns">
-      <button type="button" class="ret-btn" onclick="changeMyReply()">Change my reply</button>
+      <button type="button" class="ret-btn" id="retBtn" onclick="changeMyReply()">Change my reply</button>
       <button type="button" class="ret-alt" onclick="notMe()">This isn&rsquo;t me</button>
     </div>
     <p class="ret-note">Replying from a different phone or computer? Just fill in the form &mdash;
@@ -480,23 +494,28 @@
        link. Entirely optional: it saves them retyping what we already know,
        and a guest we have never emailed just fills the form in as normal. -->
   <div class="findme" id="findRow" hidden>
-    <div class="find-t">Were you sent an invitation?</div>
-    <div class="find-s">Enter the email address it went to and we&rsquo;ll fill in what we already have &mdash;
-      including your reply, if you have already sent one.</div>
+    <div class="find-t">Let&rsquo;s find your invitation</div>
+    <div class="find-s">Your name or the email address the invitation went to &mdash; either one.
+      We&rsquo;ll bring up everyone on it, along with your reply if you have already sent one.</div>
     <div class="find-row">
-      <input type="email" id="findEmail" placeholder="you@example.com" autocomplete="email"
-             inputmode="email" spellcheck="false">
+      <input type="text" id="findEmail" placeholder="Your name, or you@example.com"
+             autocomplete="name" spellcheck="false">
       <button type="button" class="find-btn" onclick="findMe()">Find me</button>
     </div>
     <div class="find-msg" id="findMsg"></div>
-    <button type="button" class="find-skip" onclick="skipFind()">I&rsquo;ll just fill it in myself</button>
+    <button type="button" class="find-skip" onclick="skipFind()">I wasn&rsquo;t sent an invitation &mdash; reply as a guest</button>
   </div>
 
   <div class="amending" id="invited" hidden></div>
   <div class="amending" id="amending" hidden></div>
 
   <form id="rsvpForm" novalidate>
-    <div class="field">
+    <!-- Hidden the moment we know who this is: an invitation names them, and
+         those same names are listed again below with Coming/Can't beside each.
+         Asking for it twice is the redundancy. Walk-ins — no invitation, no
+         name — still get the box, because it is the only thing identifying
+         their reply. -->
+    <div class="field" id="nameField">
       <label class="lab" for="name">Name</label>
       <input type="text" id="name" name="name" placeholder="First and last name" autocomplete="name" required>
       <div class="known" id="known" hidden>
@@ -516,6 +535,7 @@
     <div class="field" id="whoRow" hidden>
       <label class="lab" id="whoLab">Who can make it?</label>
       <div id="whoList"></div>
+      <p class="who-todo" id="whoTodo" hidden></p>
     </div>
 
     <div class="field" id="guestRow">
@@ -636,11 +656,12 @@ function buildSlots(){
 
 /* Heads at the table: the named people who said yes, plus whoever they are
    bringing on top. This is the number the Sheet stores as "party of". */
-function headcount(){ return whoPicked('yes').length + EXTRAS; }
+function headcount(){ return whoPicked('yes').length + EXTRAS + LOCKED_EXTRA.length; }
 
 /* Nobody types a total any more, so show the one we derived. Silent arithmetic
    is the kind a guest cannot correct. */
 function updateTotal(){
+  refreshTodo();
   var el = document.getElementById('partyTot');
   if(!el) return;
   var n = headcount();
@@ -653,10 +674,19 @@ function updateTotal(){
    guest themself their name is already on the reply, so it is just the extras -
    exactly as before. */
 function comingList(){
-  var extras = collectGuestNames();
-  if(!FROM_INVITE) return extras;
-  var named = whoPicked('yes');
-  return named.concat(extras ? extras.split(',').map(function(x){ return x.trim(); }).filter(Boolean) : []).join(', ');
+  var extras = splitNames(collectGuestNames());
+  /* Guests recorded by an earlier, partial reply. They are carried through
+     rather than recollected, because the boxes that named them are not on
+     screen for whoever is answering this time - dropping them would quietly
+     shrink the party. */
+  var seen = {};
+  var out = (FROM_INVITE ? whoPicked('yes') : []).concat(LOCKED_EXTRA, extras);
+  return out.filter(function(n){
+    var k = norm(n);
+    if(!k || seen[k]) return false;
+    seen[k] = true;
+    return true;
+  }).join(', ');
 }
 
 function collectGuestNames(){
@@ -718,6 +748,10 @@ function nameList(names){
    just the guest whose name is already at the top of the form. */
 var WHO = [], EXTRAS = 0, FROM_INVITE = false;
 
+/* True once the name came from an invitation rather than the guest's typing,
+   which is what takes the name box off the form. */
+var KNOWN_NAME = false;
+
 function buildWho(names, existingReply){
   FROM_INVITE = true;
   WHO = names.slice();
@@ -739,50 +773,146 @@ function selfName(){
   return n || 'You';
 }
 
-/* Only the caption changes as they type. Re-rendering the row would throw away
-   an answer they have already given. */
-function refreshSelfName(){
-  if(FROM_INVITE || !WHO.length) return;
-  WHO[0] = selfName();
-  var cell = document.querySelector('#whoList .who-n');
-  if(cell) cell.textContent = WHO[0];
+/* The row is captioned "You" and stays that way while they type. It used to
+   mirror the name box keystroke by keystroke, which made the answer row read as
+   a second copy of the field being filled in. */
+
+/* Answers already recorded, by name. Two jobs: they render as locked rows
+   rather than buttons, and they are merged back into the reply at submit -
+   which is what makes a half-finished invitation safe. One person answers for
+   themself, sends it, and when somebody else opens the same link later their
+   own row is still blank while the first answer is carried through untouched
+   instead of being overwritten with a blank.
+   LOCKED_EXTRA holds people who were recorded as coming but are not named on
+   the invitation - guests someone added - so a later partial reply does not
+   drop them from the headcount either. */
+var LOCKED = {}, UNLOCKED = {}, LOCKED_EXTRA = [];
+
+function splitNames(s){
+  return String(s || '').split(',').map(function(x){ return x.trim(); }).filter(Boolean);
+}
+
+function loadLocked(existingReply){
+  LOCKED = {}; UNLOCKED = {}; LOCKED_EXTRA = [];
+  if(!existingReply) return;
+  var named = {};
+  WHO.forEach(function(n){ named[norm(n)] = true; });
+  splitNames(existingReply.guestNames).forEach(function(n){
+    if(named[norm(n)]) LOCKED[norm(n)] = 'yes';
+    else LOCKED_EXTRA.push(n);          // an added guest, not one of the invitees
+  });
+  splitNames(existingReply.notComing).forEach(function(n){
+    if(named[norm(n)]) LOCKED[norm(n)] = 'no';
+  });
+  /* A lone guest never appears in either column - attending says it instead -
+     so read their answer from there, or their own row would come back blank. */
+  if(WHO.length === 1 && existingReply.attending && !LOCKED[norm(WHO[0])]){
+    LOCKED[norm(WHO[0])] = existingReply.attending === 'yes' ? 'yes' : 'no';
+  }
+}
+
+/* Locked until they ask otherwise: a recorded answer is shown as a statement
+   with a Change link, never as a live button. */
+function isLocked(i){
+  var k = norm(WHO[i]);
+  return !!LOCKED[k] && !UNLOCKED[k];
+}
+
+function rowHtml(n, i){
+  var k = norm(n);
+  if(isLocked(i)){
+    var yes = LOCKED[k] === 'yes';
+    return '<div class="who locked" data-i="' + i + '"><span class="who-n">' + esc(n) + '</span>' +
+      '<span class="who-said"><span class="pill ' + (yes ? 'y' : 'n') + '">' +
+      (yes ? 'Coming' : 'Can’t') + '</span>' +
+      '<button type="button" class="who-chg" onclick="unlockRow(' + i + ')">Change</button>' +
+      '</span></div>';
+  }
+  var pre = UNLOCKED[k] ? '' : (LOCKED[k] || '');   // reopened rows start blank
+  return '<div class="who" data-i="' + i + '"><span class="who-n">' + esc(n) + '</span><span class="who-pick">' +
+    '<label class="yes"><input type="radio" name="who' + i + '" value="yes"' + (pre === 'yes' ? ' checked' : '') + '><span>Coming</span></label>' +
+    '<label class="no"><input type="radio" name="who' + i + '" value="no"' + (pre === 'no' ? ' checked' : '') + '><span>Can’t</span></label>' +
+    '</span></div>';
+}
+
+/* A radio cannot normally be cleared once set, which leaves a guest who taps
+   Coming by mistake with no way back except reloading. Tapping the answer you
+   already gave clears it. */
+function wireRow(row){
+  [].forEach.call(row.querySelectorAll('input'), function(r){
+    r.dataset.was = r.checked ? '1' : '';
+    r.addEventListener('click', function(){
+      if(this.dataset.was === '1') this.checked = false;
+      [].forEach.call(document.getElementsByName(this.name), function(x){
+        x.dataset.was = x.checked ? '1' : '';
+      });
+      updateTotal();
+    });
+  });
 }
 
 function renderWho(existingReply){
-  var coming = {}, declined = {};
-  if(existingReply){
-    String(existingReply.guestNames || '').split(',').forEach(function(n){ if(n.trim()) coming[norm(n)] = true; });
-    String(existingReply.notComing  || '').split(',').forEach(function(n){ if(n.trim()) declined[norm(n)] = true; });
-  }
-  var html = '';
-  WHO.forEach(function(n, i){
-    var yes = coming[norm(n)] ? ' checked' : '';
-    var no  = declined[norm(n)] ? ' checked' : '';
-    html += '<div class="who"><span class="who-n">' + esc(n) + '</span><span class="who-pick">' +
-      '<label class="yes"><input type="radio" name="who' + i + '" value="yes"' + yes + '><span>Coming</span></label>' +
-      '<label class="no"><input type="radio" name="who' + i + '" value="no"' + no + '><span>Can’t</span></label>' +
-      '</span></div>';
-  });
-  document.getElementById('whoList').innerHTML = html;
+  loadLocked(existingReply);
+  var list = document.getElementById('whoList');
+  list.innerHTML = WHO.map(rowHtml).join('');
   document.getElementById('whoLab').textContent =
     WHO.length > 1 ? 'Who can make it?' : 'Will you be attending?';
   document.getElementById('whoRow').hidden = false;
-  document.querySelectorAll('#whoList input').forEach(function(r){
-    r.addEventListener('change', updateTotal);
-  });
+  [].forEach.call(list.querySelectorAll('.who'), wireRow);
+  updateTotal();
+}
+
+/* Says out loud that a half-answered invitation is allowed, so nobody feels
+   obliged to guess on behalf of someone who has not made their mind up. */
+function refreshTodo(){
+  var el = document.getElementById('whoTodo');
+  if(!el) return;
+  var left = whoUnanswered();
+  var anyLocked = WHO.some(function(n, i){ return isLocked(i); });
+  if(left.length && anyLocked){
+    el.textContent = 'Still to reply: ' + nameList(left) +
+      ' — you can leave them blank and they can answer from this link themselves later.';
+    el.hidden = false;
+  } else if(left.length && WHO.length > 1){
+    el.textContent = 'You can answer for some now and leave the rest blank.';
+    el.hidden = false;
+  } else {
+    el.hidden = true;
+  }
+}
+
+/* Reopening one row must not disturb answers being given in the others, so the
+   row is replaced on its own rather than the whole list re-rendered. */
+function unlockRow(i){
+  UNLOCKED[norm(WHO[i])] = true;
+  var old = document.querySelector('#whoList .who[data-i="' + i + '"]');
+  if(!old) return;
+  var tmp = document.createElement('div');
+  tmp.innerHTML = rowHtml(WHO[i], i);
+  var row = tmp.firstChild;
+  old.parentNode.replaceChild(row, old);
+  wireRow(row);
   updateTotal();
 }
 
 function norm(s){ return String(s || '').trim().toLowerCase().replace(/\s+/g, ' '); }
 
-function whoPicked(v){
-  return WHO.filter(function(n, i){
-    var el = document.querySelector('input[name=who' + i + '][value=' + v + ']:checked');
-    return !!el;
-  });
+/* The one place an answer is read, so a locked row counts exactly the same as
+   one just filled in - every total, list and validation below agrees. */
+function answerFor(i){
+  if(isLocked(i)) return LOCKED[norm(WHO[i])];
+  var el = document.querySelector('input[name=who' + i + ']:checked');
+  return el ? el.value : '';
 }
-function whoAllAnswered(){
-  return WHO.every(function(n, i){ return !!document.querySelector('input[name=who' + i + ']:checked'); });
+
+function whoPicked(v){
+  return WHO.filter(function(n, i){ return answerFor(i) === v; });
+}
+function whoUnanswered(){
+  return WHO.filter(function(n, i){ return !answerFor(i); });
+}
+function whoAnyAnswered(){
+  return WHO.some(function(n, i){ return !!answerFor(i); });
 }
 
 async function greetInvitee(){
@@ -803,18 +933,26 @@ function applyInvitation(d){
   /* The form is filled in first even when we are about to show the reply
      instead of it. "Change my reply" reveals this very form, and a couple's
      invitation has to come back with a row for each of them - the accept and
-     decline buttons are gone, so those rows are the only way to answer.
-
-     All of it stays editable - plans change, and an invitation addressed to a
-     couple is often answered by one of them. */
+     decline buttons are gone, so those rows are the only way to answer. */
   if(!nameEl.value && inv.name){
     nameEl.value = inv.name;
     lastLooked = String(inv.name).toLowerCase();
   }
-  /* Several people on one invitation: ask each of them separately. Otherwise
-     the single row above just takes the name we now know. */
-  if(inv.names && inv.names.length > 1) buildWho(inv.names, d.reply);
-  else refreshSelfName();
+  /* We know who they are, so the name box is redundant - every name on the
+     invitation is listed again below with its own Coming/Can't. */
+  showNameField(false);
+
+  /* Several people on one invitation: ask each of them separately, and the
+     reply then has to carry their names. One name is a single row captioned
+     with the name we now hold rather than "You" - but it stays outside
+     FROM_INVITE, because a lone guest's name is already on the reply and
+     repeating it in the Coming column would change what the Sheet means. */
+  if(inv.names && inv.names.length > 1){
+    buildWho(inv.names, d.reply);
+  } else {
+    WHO = [inv.name || selfName()];
+    renderWho(d.reply);
+  }
 
   var seats = parseInt(inv.seats, 10) || 1;
   if(seats > 1 && !FROM_INVITE){
@@ -833,7 +971,8 @@ function applyInvitation(d){
      waits behind it for "Change my reply". */
   if(d.reply && d.reply.name){
     saveReply({ name: d.reply.name, attending: d.reply.attending,
-                guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0 });
+                guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0,
+                guestNames: d.reply.guestNames || '', notComing: d.reply.notComing || '' });
     if(renderReturning(d.reply, true)){
       var b = document.getElementById('invited'); if(b) b.hidden = true;
       return true;
@@ -850,29 +989,38 @@ function applyInvitation(d){
       ? esc(nameList(inv.names))
       : '<b>' + esc(String(inv.name).split(/\s+/)[0]) + '</b>';
     el.innerHTML = 'Welcome, ' + who + '. Your invitation is recognised' +
-      (seats > 1 ? ' — we have you down for ' + seats + '. ' : '. ') +
-      'Everything below is editable.';
+      (seats > 1 ? ' — we have you down for ' + seats + '.' : '.');
     el.hidden = false;
   }
   return false;
 }
 
 /* ---------------------------------------------------------------------------
- * Finding yourself by email
- * Not everybody arrives by tapping the link: the address gets typed in, or the
- * mail is read on a machine that is not to hand. Rather than present a blank
- * form and make them retype what we already know, offer the address it was
- * sent to. It answers only about the one address asked for and never lists
- * anything, which is the same rule the name lookup follows.
+ * Finding yourself first
+ * Anyone without an invitation link starts here rather than at a blank form.
+ * Name or email, one box: we already hold both for everybody we invited, and a
+ * guest should not have to remember which address it went to. Finding them
+ * brings back everyone on their invitation - which is the whole point, since
+ * those names are what they answer for.
+ * The form stays out of the way until they are found, or until they say they
+ * were not invited and are replying as somebody's guest.
  * ------------------------------------------------------------------------- */
 function offerFind(){
   var row = document.getElementById('findRow');
   if(row) row.hidden = false;
+  form.style.display = 'none';          // nothing to fill in until we know who they are
+  var el = document.getElementById('findEmail'); if(el) el.focus();
 }
 
+/* Not on the list - a plus-one, or someone a guest is bringing. They get the
+   blank form, and the name box with it, because their name is then the only
+   thing identifying the reply. */
 function skipFind(){
   var row = document.getElementById('findRow');
   if(row) row.hidden = true;
+  form.style.display = '';
+  showNameField(true);
+  selfRow();
   nameEl.focus();
 }
 
@@ -883,34 +1031,42 @@ function findMsg(text, kind){
 }
 
 async function findMe(){
-  var em = document.getElementById('findEmail').value.trim();
-  if(!em || em.indexOf('@') < 0){ findMsg('Please type the email address the invitation went to.', 'err'); return; }
+  var q = document.getElementById('findEmail').value.trim();
+  if(q.length < 2){ findMsg('Please type your name, or the email your invitation went to.', 'err'); return; }
   if(ENDPOINT.indexOf('PASTE_') === 0){ skipFind(); return; }
 
   findMsg('Looking…');
   try{
-    var d = await fetch(ENDPOINT + '?find=' + encodeURIComponent(em)).then(function(r){ return r.json(); });
+    var d = await fetch(ENDPOINT + '?find=' + encodeURIComponent(q)).then(function(r){ return r.json(); });
     /* An older backend has no ?find= route and falls through to its admin
        branch, which answers with an error. Telling a guest "we could not find
-       that address" would be a lie about their invitation, so take the offer
-       off the page instead and let them fill the form in as normal. */
+       you" would be a lie about their invitation, so take the search off the
+       page instead and let them fill the form in as normal. */
     if(d && d.error){ skipFind(); return; }
+    if(d && d.ambiguous){
+      findMsg('More than one guest matches that. Please use your full name, or the email your invitation was sent to.', 'err');
+      return;
+    }
     if(!d || !d.found){
-      /* Never a dead end - plenty of people were invited by someone else, or
-         are answering for a guest who forwarded it on. */
-      findMsg('We could not find that address — no matter, just fill in the form below.', 'err');
-      setTimeout(skipFind, 2200);
+      findMsg('We could not find that. Check the spelling, try the email the invitation went to — or use the link below if you were not sent one.', 'err');
       return;
     }
     INVITE_TOKEN = d.invite.token;
     document.getElementById('findRow').hidden = true;
+    form.style.display = '';
     var showedReply = applyInvitation(d);
     markOpenedOnce();
     if(!showedReply) document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
   }catch(e){
-    findMsg('Could not check just now — please fill in the form below.', 'err');
-    setTimeout(skipFind, 2200);
+    findMsg('Could not check just now — please try again, or use the link below.', 'err');
   }
+}
+
+/* The name box earns its place only when nothing else identifies the reply. */
+function showNameField(on){
+  var f = document.getElementById('nameField');
+  if(f) f.hidden = !on;
+  KNOWN_NAME = !on;
 }
 
 /* Records that the invitation link was opened. First write wins server-side,
@@ -929,7 +1085,11 @@ function saveReply(p){
   try{
     localStorage.setItem(STORE_KEY, JSON.stringify({
       name: p.name, attending: p.attending, guests: p.guests,
-      photos: p.photoCount || 0, when: new Date().toISOString()
+      photos: p.photoCount || 0, when: new Date().toISOString(),
+      /* Kept so a return visit can name who is going and who is not without
+         going back to the Sheet — and so a half-answered invitation still
+         shows what is outstanding when there is no link to check against. */
+      guestNames: p.guestNames || '', notComing: p.notComing || ''
     }));
   }catch(e){ /* private mode — the page still works, it just will not remember */ }
 }
@@ -965,19 +1125,49 @@ function renderReturning(r, fromLink){
     if(!isNaN(d)) when = d.toLocaleDateString(undefined,{month:'long', day:'numeric'});
   }catch(e){}
 
-  var rows = '<div class="r"><span class="k">Name</span><span class="v">' + esc(r.name) + '</span></div>'
-           + '<div class="r"><span class="k">Reply</span><span class="v">' + (yes ? 'Joyfully accepts' : 'Regretfully declines') + '</span></div>';
+  /* Who is going and who is not, by name. On an invitation naming several
+     people that IS the reply, and repeating the name of whoever happened to
+     submit it above the same list only reads as a duplicate. A lone guest has
+     no such list, so their name stays - there it is the only thing on the
+     panel identifying the reply. */
+  var going = splitNames(r.guestNames), cant = splitNames(r.notComing);
+  var rows = '';
+  if(going.length || cant.length){
+    if(going.length) rows += '<div class="r"><span class="k">Going</span><span class="v">' + esc(nameList(going)) + '</span></div>';
+    if(cant.length)  rows += '<div class="r"><span class="k">Can’t make it</span><span class="v">' + esc(nameList(cant)) + '</span></div>';
+    /* Anyone on the invitation still unaccounted for — the whole point of
+       letting a family reply in instalments is being told what is outstanding. */
+    var answered = {};
+    going.concat(cant).forEach(function(n){ answered[norm(n)] = true; });
+    /* Only meaningful when WHO holds the invitation's real names. Without a
+       recognised invitation it is the placeholder "You", which would come back
+       as a guest who has not replied. */
+    var waiting = FROM_INVITE ? WHO.filter(function(n){ return !answered[norm(n)]; }) : [];
+    if(waiting.length) rows += '<div class="r"><span class="k">Not yet replied</span><span class="v">' + esc(nameList(waiting)) + '</span></div>';
+  } else {
+    rows += '<div class="r"><span class="k">Name</span><span class="v">' + esc(r.name) + '</span></div>'
+          + '<div class="r"><span class="k">Reply</span><span class="v">' + (yes ? 'Joyfully accepts' : 'Regretfully declines') + '</span></div>';
+  }
   if(yes) rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(r.guests) + '</span></div>';
   var photoCount = parseInt(r.photos, 10) || 0;
   if(photoCount > 0) rows += '<div class="r"><span class="k">Photos</span><span class="v">' + photoCount + ' sent</span></div>';
-  if(yes && r.guestNames) rows += '<div class="r"><span class="k">With</span><span class="v">' + esc(r.guestNames) + '</span></div>';
   if(when) rows += '<div class="r"><span class="k">Sent</span><span class="v">' + esc(when) + '</span></div>';
   document.getElementById('retDetail').innerHTML = rows;
 
+  /* When somebody on the invitation has still not answered, the useful button
+     is not "change what I said" - it is "let me answer for them". */
+  var outstanding = FROM_INVITE && (going.length || cant.length) && WHO.some(function(n){
+    return !going.concat(cant).some(function(m){ return norm(m) === norm(n); });
+  });
+  var rb = document.getElementById('retBtn');
+  if(rb) rb.textContent = outstanding ? 'Reply for someone else' : 'Change my reply';
+
   var note = document.querySelector('#returning .ret-note');
-  if(note) note.innerHTML = fromLink
-    ? 'This is the reply we have for your invitation. Change it any time from this link.'
-    : 'Replying from a different phone or computer? Just fill in the form &mdash; we match on your name.';
+  if(note) note.innerHTML = outstanding
+    ? 'Anyone still to answer can do it from this same link &mdash; replies already in are kept.'
+    : (fromLink
+      ? 'This is the reply we have for your invitation. Change it any time from this link.'
+      : 'Replying from a different phone or computer? Just search for your name again.');
 
   document.getElementById('returning').hidden = false;
   form.style.display = 'none';
@@ -995,10 +1185,12 @@ function notMe(){
   forgetReply();
   INVITE_TOKEN = '';
   WHO = []; EXTRAS = 0; FROM_INVITE = false;
+  LOCKED = {}; UNLOCKED = {}; LOCKED_EXTRA = [];
   AMENDING = false; EXISTING = null; lastLooked = '';
 
   form.reset();
   document.getElementById('whoList').innerHTML = '';
+  document.getElementById('whoRow').hidden = true;
   document.getElementById('namesRow').hidden = true;
   document.getElementById('nameSlots').innerHTML = '';
   document.getElementById('amending').hidden = true;
@@ -1007,9 +1199,13 @@ function notMe(){
   btn.textContent = 'Send Reply';
   show('', '');
   setExtras(0);
-  selfRow();
 
-  nameEl.focus();
+  /* Back to the search, not to a blank form. Whoever this is still has to be
+     found before they can answer for anyone — and if they really are not on
+     the list, the search offers the guest route. */
+  var fe = document.getElementById('findEmail'); if(fe) fe.value = '';
+  findMsg('', '');
+  offerFind();
   document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
 }
 
@@ -1024,13 +1220,22 @@ function changeMyReply(){
 
   if(r && r.name){
     nameEl.value = r.name;
-    refreshSelfName();                   // the yes/no row is captioned with it
     lastLooked = r.name.toLowerCase();   // suppress the "already replied" notice; they know
     AMENDING = true;
+
+    /* Answers already given come back locked, so opening this to answer for
+       one more person cannot quietly undo somebody else's. Each locked row
+       carries its own Change. */
+    if(WHO.length) renderWho(r);
+
+    var waiting = whoUnanswered();
     var banner = document.getElementById('amending');
-    banner.innerHTML = 'Changing the reply for <b>' + esc(r.name) + '</b>. ' +
-      'Choose your answer below — it replaces the previous one. ' +
-      'Photos already sent are kept, and new ones are added.';
+    banner.innerHTML = waiting.length && WHO.length > 1
+      ? 'Replies already in are kept. Answer for <b>' + esc(nameList(waiting)) + '</b> below, ' +
+        'or press Change beside a name to alter an answer. ' +
+        'Photos already sent are kept, and new ones are added.'
+      : 'Press Change beside a name to alter that answer — it replaces the previous one. ' +
+        'Photos already sent are kept, and new ones are added.';
     banner.hidden = false;
     btn.textContent = 'Update My Reply';
   }
@@ -1046,7 +1251,6 @@ nameEl.addEventListener('input', function(){
   /* If they edit the name after being warned, the warning no longer applies. */
   clearTimeout(lookupTimer);
   if (!AMENDING) hideKnown();
-  refreshSelfName();
   lookupTimer = setTimeout(maybeLookup, 900);
 });
 
@@ -1225,14 +1429,19 @@ form.addEventListener('submit', async function(e){
 
   if(!name){ show('err','Please enter your name.'); document.getElementById('name').focus(); return; }
   /* A single word is almost always a first name only, which makes two "Jim"s
-     impossible to tell apart on the guest list — and the backend now keys on
-     the name, so it would also overwrite one with the other. */
-  if(name.split(/\s+/).length < 2){ show('err','Please include a last name too.'); document.getElementById('name').focus(); return; }
-  /* The only yes/no on the form now, so an unanswered row is an unanswered
-     RSVP - there is no second question further down to fall back on. */
-  if(!whoAllAnswered()){
+     impossible to tell apart on the guest list — and the backend keys on the
+     name, so it would also overwrite one with the other. Only asked of people
+     typing it in: a name that came off the invitation is the one already on the
+     guest list, and rejecting it would strand them. */
+  if(!KNOWN_NAME && name.split(/\s+/).length < 2){
+    show('err','Please include a last name too.'); document.getElementById('name').focus(); return;
+  }
+  /* At least one answer, not every answer. A family can reply for whoever has
+     decided and leave the rest for later - the blanks stay blank rather than
+     being recorded as a no. */
+  if(!whoAnyAnswered()){
     show('err', WHO.length > 1
-      ? 'Please say who can make it — tap Coming or Can’t beside each name.'
+      ? 'Please answer for at least one person — tap Coming or Can’t beside a name.'
       : 'Please let us know whether you can attend.');
     document.getElementById('whoRow').scrollIntoView({ behavior:'smooth', block:'center' });
     return;
@@ -1308,20 +1517,32 @@ function confirmed(p){
     ? 'Your reply has been received. Bob will be so glad you are coming.'
     : 'Your reply has been received — you will be missed, and we will raise a glass to you.';
 
-  var rows = '<div class="r"><span class="k">Name</span><span class="v">' + esc(p.name) + '</span></div>'
-           + '<div class="r"><span class="k">Reply</span><span class="v">' + (yes ? 'Joyfully accepts' : 'Regretfully declines') + '</span></div>';
+  /* Same shape as the returning panel: the names carry the answer, so the
+     submitter's own name is not repeated above a list that already holds it. */
+  var going = splitNames(p.guestNames), cant = splitNames(p.notComing);
+  var rows = '';
+  if(going.length || cant.length){
+    if(going.length) rows += '<div class="r"><span class="k">Going</span><span class="v">' + esc(nameList(going)) + '</span></div>';
+    if(cant.length)  rows += '<div class="r"><span class="k">Can’t make it</span><span class="v">' + esc(nameList(cant)) + '</span></div>';
+    var done = {};
+    going.concat(cant).forEach(function(n){ done[norm(n)] = true; });
+    var waiting = FROM_INVITE ? WHO.filter(function(n){ return !done[norm(n)]; }) : [];
+    if(waiting.length){
+      rows += '<div class="r"><span class="k">Not yet replied</span><span class="v">' + esc(nameList(waiting)) +
+              ' &mdash; they can answer from this link</span></div>';
+    }
+  } else {
+    rows += '<div class="r"><span class="k">Name</span><span class="v">' + esc(p.name) + '</span></div>'
+          + '<div class="r"><span class="k">Reply</span><span class="v">' + (yes ? 'Joyfully accepts' : 'Regretfully declines') + '</span></div>';
+  }
   if(p.photoCount > 0){
     rows += '<div class="r"><span class="k">Photos</span><span class="v">' + p.photoCount + ' received &mdash; thank you</span></div>';
   }
   if(p.toast){
     rows += '<div class="r"><span class="k">Your note</span><span class="v">Received &mdash; thank you</span></div>';
   }
-  if(p.notComing){
-    rows += '<div class="r"><span class="k">Not coming</span><span class="v">' + esc(p.notComing) + '</span></div>';
-  }
   if(yes){
     rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(p.guests) + '</span></div>'
-          + (p.guestNames ? '<div class="r"><span class="k">Coming</span><span class="v">' + esc(p.guestNames) + '</span></div>' : '')
           + '<div class="r"><span class="k">When</span><span class="v">Sat, Oct 17, 2026 &middot; Cocktails 5:00</span></div>'
           + '<div class="r"><span class="k">Where</span><span class="v">Virginia Country Club, Long Beach</span></div>';
   }
