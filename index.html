@@ -1005,11 +1005,17 @@ function applyInvitation(d){
  * The form stays out of the way until they are found, or until they say they
  * were not invited and are replying as somebody's guest.
  * ------------------------------------------------------------------------- */
-function offerFind(){
+/* focusBox is only ever true when the guest asked for this panel ("this isn't
+   me"). On first load it must stay false: focusing an input this far down the
+   page makes the browser jump straight to it, and the guest never sees the top
+   of the invitation. */
+function offerFind(focusBox){
   var row = document.getElementById('findRow');
   if(row) row.hidden = false;
   form.style.display = 'none';          // nothing to fill in until we know who they are
-  var el = document.getElementById('findEmail'); if(el) el.focus();
+  if(focusBox){
+    var el = document.getElementById('findEmail'); if(el) el.focus();
+  }
 }
 
 /* Not on the list - a plus-one, or someone a guest is bringing. They get the
@@ -1205,7 +1211,7 @@ function notMe(){
      the list, the search offers the guest route. */
   var fe = document.getElementById('findEmail'); if(fe) fe.value = '';
   findMsg('', '');
-  offerFind();
+  offerFind(true);
   document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
 }
 
