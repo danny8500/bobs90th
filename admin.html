@@ -981,6 +981,14 @@ function csvToLines(rows){
     rows = rows.slice(1);
   }
 
+  /* No header row to read: if nearly every line leads with "2." or "17 ", the
+     first column is a household label, not part of anybody's name - pasting
+     sheet rows without their header used to glue that label onto the name. */
+  if(!hasHeader && rows.length && rows[0].length > 2){
+    var numbered = rows.filter(function(r){ return /^\d+[\s.)-]/.test(String(r[0] || '').trim()); }).length;
+    if(numbered >= rows.length * 0.8) iGroup = 0;
+  }
+
   /* Addresses in one cell. A spreadsheet exporting "a@x.com, b@y.com" quotes
      it into a single field, so testing the whole cell finds no address at all
      and the row used to be dropped without a word. Split first, then test. */
@@ -1013,7 +1021,9 @@ function csvToLines(rows){
     if(iFirst >= 0 || iLast >= 0) name = [r[iFirst] || '', r[iLast] || ''].join(' ').trim();
     else if(iName >= 0) name = r[iName] || '';
     if(!name){
-      name = r.filter(function(c){ return c && !cellEmails(c).length && !/^\d+$/.test(c); }).join(' ').trim();
+      /* The group label is never a name - a spacer row under "9. Mottesi" used
+         to import as a phantom guest called "9. Mottesi". */
+      name = r.filter(function(c, ci){ return ci !== iGroup && c && !cellEmails(c).length && !/^\d+$/.test(c); }).join(' ').trim();
     }
     if(!name && emails.length) name = emails[0].split('@')[0];
     if(!name){ skipped++; return; }          // no name and no address is an empty row
