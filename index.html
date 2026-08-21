@@ -6,7 +6,7 @@
 <title>Bob's 90th Birthday</title>
 <meta name="description" content="Please join us in celebrating Bob's 90th birthday — Saturday, October 17, 2026 at Virginia Country Club, Long Beach. Ninety years well played.">
 <meta property="og:title" content="Bob's 90th Birthday — Please RSVP">
-<meta property="og:description" content="Saturday, October 17, 2026 · Virginia Country Club, Long Beach · Cocktails 5:00, Dinner 6:30">
+<meta property="og:description" content="Saturday, October 17, 2026 · Virginia Country Club, Long Beach · 6:00 PM">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://bobs90th.com/">
 <!-- The link gets texted and emailed, so the preview card is the first thing most
@@ -441,7 +441,7 @@
   <p class="tagline">ninety years well played</p>
   <p class="whenline lining">Saturday<span class="sep">&middot;</span>October 17<span class="sep">&middot;</span>2026</p>
   <p class="whereline">Virginia Country Club &mdash; Long Beach, California</p>
-  <p class="timesline lining">Cocktails 5:00 PM &nbsp;&mdash;&nbsp; Dinner 6:30 PM</p>
+  <p class="timesline lining">6:00 PM</p>
   <a class="cta" href="#rsvp">RSVP Below</a>
   <span class="thread" aria-hidden="true"></span>
 </header>
@@ -452,11 +452,8 @@
     <p class="eyebrow">The Evening</p>
     <div class="cols">
       <div class="col">
-        <div class="lab">Cocktails</div>
-        <div class="big lining">5:00 <span style="font-size:.6em">PM</span></div>
-        <div class="vsep"></div>
-        <div class="lab">Dinner</div>
-        <div class="big lining">6:30 <span style="font-size:.6em">PM</span></div>
+        <div class="lab">The Time</div>
+        <div class="big lining">6:00 <span style="font-size:.6em">PM</span></div>
       </div>
       <div class="col">
         <div class="lab">The Club</div>
@@ -495,7 +492,7 @@
        guest is actually replying. -->
   <div class="recap lining" id="recap">
     <span>Sat, October 17, 2026</span><span class="rsep">&middot;</span>
-    <span>Cocktails 5:00 &middot; Dinner 6:30</span><span class="rsep">&middot;</span>
+    <span>6:00 PM</span><span class="rsep">&middot;</span>
     <span><a href="https://maps.google.com/?q=500+Virginia+Country+Club+Road,+Long+Beach,+CA+90807" target="_blank" rel="noopener">Virginia Country Club, Long Beach</a></span><span class="rsep">&middot;</span>
     <span>Cocktail attire</span>
   </div>
@@ -1577,7 +1574,7 @@ function confirmed(p){
   }
   if(yes){
     rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(p.guests) + '</span></div>'
-          + '<div class="r"><span class="k">When</span><span class="v">Sat, Oct 17, 2026 &middot; Cocktails 5:00</span></div>'
+          + '<div class="r"><span class="k">When</span><span class="v">Sat, Oct 17, 2026 &middot; 6:00 PM</span></div>'
           + '<div class="r"><span class="k">Where</span><span class="v">Virginia Country Club, Long Beach</span></div>';
   }
   document.getElementById('doneDetail').innerHTML = rows;
@@ -1614,8 +1611,8 @@ function restart(e){
  * opened straight by the Calendar app on iOS and by the calendar chooser on
  * Android, and Google Calendar users get a prefilled event with no file at all.
  *
- * The event is 5pm Pacific, and it is pinned to that. A guest opening this from
- * another timezone gets their own correct local time instead of a bare "5pm"
+ * The event is 6pm Pacific, and it is pinned to that. A guest opening this from
+ * another timezone gets their own correct local time instead of a bare "6pm"
  * that would have them arrive hours out. The .ics carries the same instant as
  * UTC; here Google is given the local time plus the zone to read it in.
  * ------------------------------------------------------------------------- */
@@ -1625,10 +1622,10 @@ function googleCalUrl(){
   var q = {
     action:  'TEMPLATE',
     text:    "Bob's 90th Birthday",
-    dates:   '20261017T170000/20261017T220000',
+    dates:   '20261017T180000/20261017T220000',
     ctz:     'America/Los_Angeles',
     location:'Virginia Country Club, 500 Virginia Country Club Road, Long Beach, CA 90807',
-    details: 'Cocktails at 5:00 PM\nDinner at 6:30 PM\nNinety years well played.'
+    details: 'Starts at 6:00 PM\nNinety years well played.'
   };
   return 'https://calendar.google.com/calendar/render?' +
     Object.keys(q).map(function(k){ return k + '=' + encodeURIComponent(q[k]); }).join('&');
