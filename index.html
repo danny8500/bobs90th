@@ -6,7 +6,7 @@
 <title>Bob's 90th Birthday</title>
 <meta name="description" content="Please join us in celebrating Bob's 90th birthday — Saturday, October 17, 2026 at Virginia Country Club, Long Beach. Ninety years well played.">
 <meta property="og:title" content="Bob's 90th Birthday — Please RSVP">
-<meta property="og:description" content="Saturday, October 17, 2026 · Virginia Country Club, Long Beach · 6:00 PM">
+<meta property="og:description" content="Saturday, October 17, 2026 · Virginia Country Club, Long Beach · Cocktails 6:00 PM · Dinner 7:00 PM">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://bobs90th.com/">
 <!-- The link gets texted and emailed, so the preview card is the first thing most
@@ -450,7 +450,7 @@
   <p class="tagline">ninety years well played</p>
   <p class="whenline lining">Saturday<span class="sep">&middot;</span>October 17<span class="sep">&middot;</span>2026</p>
   <p class="whereline">Virginia Country Club &mdash; Long Beach, California</p>
-  <p class="timesline lining">6:00 PM</p>
+  <p class="timesline lining">Cocktails 6:00 PM<span class="sep">&middot;</span>Dinner 7:00 PM</p>
   <a class="cta" href="#rsvp">RSVP Below</a>
   <span class="thread" aria-hidden="true"></span>
 </header>
@@ -463,6 +463,7 @@
       <div class="col">
         <div class="lab">The Time</div>
         <div class="big lining">6:00 <span style="font-size:.6em">PM</span></div>
+        <div class="small lining">Cocktails at 6:00 &middot; Dinner at 7:00</div>
       </div>
       <div class="col">
         <div class="lab">The Club</div>
@@ -480,7 +481,7 @@
     <div class="dress">
       <span class="dress-lab">Dress</span>
       <span class="dress-v">Cocktail attire</span>
-      <span class="dress-note">Jacket optional &middot; no need for a suit</span>
+      <span class="dress-note">Jacket optional</span>
     </div>
   </div>
 </section>
@@ -501,7 +502,8 @@
        guest is actually replying. -->
   <div class="recap lining" id="recap">
     <span>Sat, October 17, 2026</span><span class="rsep">&middot;</span>
-    <span>6:00 PM</span><span class="rsep">&middot;</span>
+    <span>Cocktails 6:00 PM</span><span class="rsep">&middot;</span>
+    <span>Dinner 7:00 PM</span><span class="rsep">&middot;</span>
     <span><a href="https://maps.google.com/?q=500+Virginia+Country+Club+Road,+Long+Beach,+CA+90807" target="_blank" rel="noopener">Virginia Country Club, Long Beach</a></span><span class="rsep">&middot;</span>
     <span>Cocktail attire</span>
   </div>
@@ -1632,7 +1634,7 @@ function confirmed(p){
   }
   if(yes){
     rows += '<div class="r"><span class="k">Party of</span><span class="v">' + esc(p.guests) + '</span></div>'
-          + '<div class="r"><span class="k">When</span><span class="v">Sat, Oct 17, 2026 &middot; 6:00 PM</span></div>'
+          + '<div class="r"><span class="k">When</span><span class="v">Sat, Oct 17, 2026 &middot; Cocktails 6:00 PM &middot; Dinner 7:00 PM</span></div>'
           + '<div class="r"><span class="k">Where</span><span class="v">Virginia Country Club, Long Beach</span></div>';
   }
   document.getElementById('doneDetail').innerHTML = rows;
@@ -1683,7 +1685,7 @@ function googleCalUrl(){
     dates:   '20261017T180000/20261017T220000',
     ctz:     'America/Los_Angeles',
     location:'Virginia Country Club, 500 Virginia Country Club Road, Long Beach, CA 90807',
-    details: 'Starts at 6:00 PM\nNinety years well played.'
+    details: 'Cocktails at 6:00 PM\nDinner at 7:00 PM\nNinety years well played.'
   };
   return 'https://calendar.google.com/calendar/render?' +
     Object.keys(q).map(function(k){ return k + '=' + encodeURIComponent(q[k]); }).join('&');
