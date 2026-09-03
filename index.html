@@ -437,6 +437,9 @@
   .foot{background:var(--navy-ink); color:#8FA0B8; text-align:center; padding:54px 24px 58px; font-size:15px; font-style:italic; line-height:1.7}
   .foot .fx{font-family:var(--script); font-size:52px; color:var(--gold-lt); font-style:normal; margin-bottom:8px; line-height:1.2; padding:0 .45em}
   .foot a{color:#C6D0DF}
+
+  #done #extras{margin:38px auto 0; max-width:560px; text-align:left;
+    border-top:1px solid rgba(27,58,99,.14); padding-top:26px}
 </style>
 </head>
 <body>
@@ -590,6 +593,14 @@
       <div id="nameSlots"></div>
     </div>
 
+    <button type="submit" class="btn" id="submitBtn">Send Reply</button>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+
+    <!-- The optional extras live BELOW the confirmation, not on the form: the
+         reply is the thing we need, and a guest should not scroll past a photo
+         drop to say yes. confirmed() moves this block under #done and reveals
+         it; sendExtras() rides the ordinary update path. -->
+    <div id="extras" hidden>
     <div class="field">
       <label class="lab" for="toast">Anything else we should know? <span class="opt">&mdash; optional</span></label>
       <p class="dz-help">Bringing the kids, arriving late, might have to cancel,
@@ -614,9 +625,10 @@
       <div class="dz-note" id="photoNote"></div>
     </div>
 
-    <button type="submit" class="btn" id="submitBtn">Send Reply</button>
+    <button type="button" class="btn" id="extrasBtn" onclick="sendExtras()">Add to My Reply</button>
     <div class="prog" id="prog"><div class="prog-bar"><i id="progBar"></i></div><div class="prog-t" id="progT"></div></div>
-    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+    <div class="msg" id="exMsg" role="status" aria-live="polite"></div>
+    </div><!-- /extras -->
   </form>
 
   <!-- confirmation replaces the form in place -->
@@ -1020,7 +1032,7 @@ function applyInvitation(d){
     var who = (inv.names && inv.names.length > 1)
       ? esc(nameList(inv.names))
       : '<b>' + esc(String(inv.name).split(/\s+/)[0]) + '</b>';
-    el.innerHTML = 'Welcome, ' + who + '. Your invitation is recognised' +
+    el.innerHTML = 'Welcome, ' + who + '. Your invitation is recognized' +
       (seats > 1 ? ' — we have you down for ' + seats + '.' : '.');
     el.hidden = false;
   }
@@ -1596,11 +1608,62 @@ form.addEventListener('submit', async function(e){
   }
 });
 
+/* Send the note and photos as a follow-up to a reply that is already in.
+   The backend treats a repeat rsvp as an update to the same row, and photos
+   post one per request exactly as the main submit did. */
+async function sendExtras(){
+  var r = readReply();
+  if(!r || !r.name){ exShow('Please send your reply first.'); return; }
+  var note = document.getElementById('toast').value.trim();
+  if(!note && !PHOTOS.length){ exShow('Add a note or a photo first \u2014 or skip this, it is optional.'); return; }
+  var b = document.getElementById('extrasBtn');
+  b.disabled = true; b.textContent = 'Sending\u2026'; exShow('');
+  try{
+    var payload = { type:'rsvp', name:r.name, attending:r.attending,
+      guests:String(r.guests || (r.attending === 'yes' ? 1 : 0)),
+      photoCount:PHOTOS.length, toast:note,
+      guestNames:r.guestNames || '', notComing:r.notComing || '',
+      invite:INVITE_TOKEN || r.invite || '' };
+    if(PHOTOS.length) progress(6, 'Sending\u2026');
+    await post(payload);
+    for(var i = 0; i < PHOTOS.length; i++){
+      progress(10 + Math.round((i / PHOTOS.length) * 88),
+               'Uploading photo ' + (i + 1) + ' of ' + PHOTOS.length + '\u2026');
+      await post({ type:'photo', name:r.name, filename:PHOTOS[i].name, dataUrl:PHOTOS[i].dataUrl });
+    }
+    if(PHOTOS.length) progress(100, 'Done.');
+    saveReply(payload);
+    b.textContent = 'Added \u2014 thank you';
+    document.getElementById('extras').dataset.sent = '1';
+    setTimeout(function(){ document.getElementById('prog').classList.remove('show'); }, 900);
+  }catch(err){
+    b.disabled = false; b.textContent = 'Add to My Reply';
+    document.getElementById('prog').classList.remove('show');
+    exShow('Something went wrong sending that \u2014 please try again.');
+  }
+}
+function exShow(t){
+  var el = document.getElementById('exMsg');
+  el.className = 'msg' + (t ? ' err show' : '');
+  el.textContent = t || '';
+}
+
 function confirmed(p){
   var yes = p.attending === 'yes';
   saveReply(p);
   form.style.display = 'none';
   document.getElementById('formHead').style.display = 'none';
+
+  /* The extras (note + photos) come out to live under the confirmation, so
+     the invitation is answered first and everything else is an afterthought
+     in the literal sense. Moving the node preserves anything already typed
+     or attached. */
+  var ex = document.getElementById('extras');
+  if(ex){
+    if(ex.parentElement !== document.getElementById('done'))
+      document.getElementById('done').appendChild(ex);
+    if(!ex.dataset.sent) ex.hidden = false;
+  }
 
   document.getElementById('doneScript').textContent = yes ? 'Wonderful!' : 'Thank you';
   document.getElementById('doneTitle').textContent  = yes ? 'We Will See You There' : 'Your Reply Is In';
