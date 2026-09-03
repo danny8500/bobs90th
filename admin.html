@@ -227,6 +227,7 @@
     <div class="stat declined"><div class="n" id="sNo">&mdash;</div><div class="l">Can&rsquo;t come</div></div>
     <div class="stat"><div class="n" id="sYes">&mdash;</div><div class="l">Replies in</div></div>
     <div class="stat"><div class="n" id="sPhotos">&mdash;</div><div class="l">Photos sent in</div></div>
+    <div class="stat"><div class="n" id="sAwaiting">&mdash;</div><div class="l">No reply yet</div></div>
   </div>
   <div class="folderline" id="headGap"></div>
   <div class="folderline" id="folderline"></div>
@@ -400,6 +401,9 @@ function stats(){
     stated > heads ? heads + ' of ' + stated : heads;
   document.getElementById('sNo').textContent = cant;
   document.getElementById('sYes').textContent = ROWS.length;
+  /* invitations that have not come back at all - the chase list's size */
+  var aw = document.getElementById('sAwaiting');
+  if(aw) aw.textContent = INVITES.filter(function(i){ return !i.replied; }).length;
   document.getElementById('sPhotos').textContent = pics;
   var gap = document.getElementById('headGap');
   if(gap){
