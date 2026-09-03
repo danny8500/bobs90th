@@ -303,6 +303,15 @@
   }
   .find-btn:hover{background:var(--navy-deep)}
   .find-msg{font-size:14px; margin-top:12px; min-height:1px}
+  /* the "which invitation is yours?" choices - quiet outlined rows in the
+     site's own voice, not a second wall of navy buttons */
+  #findOpts{display:flex; flex-direction:column; gap:8px; margin:12px auto 0; max-width:420px}
+  .find-opt{
+    font-family:var(--serif); font-size:15.5px; padding:11px 16px; cursor:pointer;
+    color:var(--navy); background:var(--cream); border:1px solid rgba(27,58,99,.30);
+    text-align:center;
+  }
+  .find-opt:hover{background:var(--navy); color:var(--cream)}
   .find-msg.err{color:var(--red); font-style:italic}
   .find-msg.ok{color:var(--navy)}
   .find-skip{
@@ -1063,6 +1072,7 @@ async function findMe(){
   if(ENDPOINT.indexOf('PASTE_') === 0){ skipFind(); return; }
 
   findMsg('Looking…');
+  clearFindOptions();
   try{
     var d = await fetch(ENDPOINT + '?find=' + encodeURIComponent(q)).then(function(r){ return r.json(); });
     /* An older backend has no ?find= route and falls through to its admin
@@ -1070,6 +1080,12 @@ async function findMe(){
        you" would be a lie about their invitation, so take the search off the
        page instead and let them fill the form in as normal. */
     if(d && d.error){ skipFind(); return; }
+    /* Several invitations carry that name: list who each is addressed to and
+       let the guest say which is theirs, instead of guessing (2026-09-03). */
+    if(d && d.options && d.options.length){
+      showFindOptions(d.options);
+      return;
+    }
     if(d && d.ambiguous){
       findMsg('More than one guest matches that. Please use your full name, or the email your invitation was sent to.', 'err');
       return;
@@ -1078,14 +1094,56 @@ async function findMe(){
       findMsg('We could not find that. Check the spelling, try the email the invitation went to — or use the link below if you were not sent one.', 'err');
       return;
     }
-    INVITE_TOKEN = d.invite.token;
-    document.getElementById('findRow').hidden = true;
-    form.style.display = '';
-    var showedReply = applyInvitation(d);
-    markOpenedOnce();
-    if(!showedReply) document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
+    adoptInvitation(d);
   }catch(e){
     findMsg('Could not check just now — please try again, or use the link below.', 'err');
+  }
+}
+
+/* The one success path, whether found directly or picked off the list. */
+function adoptInvitation(d){
+  INVITE_TOKEN = d.invite.token;
+  document.getElementById('findRow').hidden = true;
+  clearFindOptions();
+  form.style.display = '';
+  var showedReply = applyInvitation(d);
+  markOpenedOnce();
+  if(!showedReply) document.getElementById('rsvp').scrollIntoView({ behavior:'smooth' });
+}
+
+function clearFindOptions(){
+  var box = document.getElementById('findOpts');
+  if(box) box.remove();
+}
+
+/* "Which of these is yours?" — one button per matching invitation, named the
+   way the invitation is addressed, so Jim Bohm and Jim Prince each recognise
+   their own household rather than landing on Selmira's. */
+function showFindOptions(opts){
+  findMsg('That name is on more than one invitation — which one is yours?');
+  clearFindOptions();
+  var box = document.createElement('div');
+  box.id = 'findOpts';
+  document.getElementById('findMsg').insertAdjacentElement('afterend', box);
+  opts.forEach(function(o){
+    if(!o || !o.token) return;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'find-opt';
+    b.textContent = o.names || 'Invitation';
+    b.onclick = function(){ pickInvite(o.token); };
+    box.appendChild(b);
+  });
+}
+
+async function pickInvite(token){
+  findMsg('One moment…');
+  try{
+    var d = await fetch(ENDPOINT + '?invite=' + encodeURIComponent(token)).then(function(r){ return r.json(); });
+    if(!d || !d.found){ findMsg('Could not open that invitation — please try again.', 'err'); return; }
+    adoptInvitation(d);
+  }catch(e){
+    findMsg('Could not check just now — please try again.', 'err');
   }
 }
 
