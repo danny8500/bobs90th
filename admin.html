@@ -759,12 +759,21 @@ function setInvFilter(f, btn){
    is actually still outstanding. */
 function inviteStatus(i){
   var invited = splitNames(i.name);
+  /* Match replies to this invitation by TOKEN first. But re-sending an
+     invitation mints a new token, orphaning earlier replies under the old one,
+     so when this invitation has no token-matched reply we fall back to matching
+     replies by NAME - and in that mode only count names that are actually on
+     THIS invitation, so a stray first name from another household cannot leak
+     in (operator, 2026-09-03: a re-sent invite showed both people unreplied). */
+  var tokenRows = ROWS.filter(function(r){ return norm(r.invite) === norm(i.token); });
+  var scope = tokenRows.length ? tokenRows : ROWS;
+  var byName = tokenRows.length === 0;
+  var onInvite = function(n){ return invited.some(function(x){ return norm(x) === norm(n); }); };
   var answered = {};
-  ROWS.forEach(function(r){
-    if(norm(r.invite) !== norm(i.token)) return;
+  scope.forEach(function(r){
     var named = splitNames(r.guestNames).concat(splitNames(r.notComing));
     if(!named.length && r.name) named = [r.name];   // a lone reply names itself in col B
-    named.forEach(function(n){ answered[norm(n)] = true; });
+    named.forEach(function(n){ if(!byName || onInvite(n)) answered[norm(n)] = true; });
   });
   var awaiting = invited.filter(function(n){ return n && !answered[norm(n)]; });
   var answeredCount = Math.max(0, invited.length - awaiting.length);
