@@ -439,12 +439,18 @@ function guestList(){
   ROWS.forEach(function(r){
     var coming = splitNames(r.guestNames);
     var cant   = splitNames(r.notComing);
-    /* Somebody replying only for themself is named nowhere but the reply, so
-       take their answer from the reply itself. When the reply does name them,
-       it has already said which side they are on. */
-    var named = {};
-    coming.concat(cant).forEach(function(n){ named[norm(n)] = true; });
-    if(!named[norm(r.name)]) (r.attending === 'yes' ? coming : cant).unshift(r.name);
+    /* A reply that lists people (guestNames / notComing) has already said who is
+       on which side - trust it. Only when it names NOBODY do we fall back to the
+       row's own Name, which is the lone-guest case (they answered just for
+       themself and their name lives only in the Name column).
+
+       The old test was "add the row Name unless it is already listed" - but on a
+       multi-person invitation the Name column holds the invitation's CONTACT
+       ("Danny"), not necessarily an answerer, so when Andrew replied for himself
+       the panel wrongly showed Danny coming too (operator, 2026-09-03). */
+    if(!coming.length && !cant.length){
+      (r.attending === 'yes' ? coming : cant).unshift(r.name);
+    }
 
     var group = [];
     coming.forEach(function(n){ group.push({ name: n, coming: true,  reply: r }); });
