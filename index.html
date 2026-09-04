@@ -598,9 +598,10 @@
 
     <!-- The optional extras live BELOW the confirmation, not on the form: the
          reply is the thing we need, and a guest should not scroll past a photo
-         drop to say yes. confirmed() moves this block under #done and reveals
-         it; sendExtras() rides the ordinary update path. -->
+         drop to say yes. confirmed()/renderReturning() move this block under the
+         active panel and reveal it; sendExtras() rides the ordinary update path. -->
     <div id="extras" hidden>
+    <p class="extras-head" id="extrasHead" hidden>Anything to add? A note or a photo of Bob &mdash; optional, any time.</p>
     <div class="field">
       <label class="lab" for="toast">Anything else we should know? <span class="opt">&mdash; optional</span></label>
       <p class="dz-help">Bringing the kids, arriving late, might have to cancel,
@@ -1276,6 +1277,18 @@ function renderReturning(r, fromLink){
   form.style.display = 'none';
   document.getElementById('formHead').style.display = 'none';
   var recap = document.getElementById('recap'); if(recap) recap.style.display = 'none';
+
+  /* The note + photo drop follow the reply onto this panel, so somebody coming
+     back to check their RSVP can still add a picture or a dietary note without
+     re-opening the whole form. Not shown once they have already added here. */
+  var ex = document.getElementById('extras');
+  if(ex && !ex.dataset.sent){
+    if(ex.parentElement !== document.getElementById('returning'))
+      document.getElementById('returning').appendChild(ex);
+    ex.hidden = false;
+    var head = document.getElementById('extrasHead');
+    if(head) head.hidden = false;
+  }
   return true;
 }
 
