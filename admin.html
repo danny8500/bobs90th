@@ -81,6 +81,7 @@
         padding:3px 10px; border-radius:999px; white-space:nowrap}
   .pill.yes{background:var(--green-bg); color:var(--green)}
   .pill.no{background:var(--red-bg); color:var(--red)}
+  .pill.none{background:#EEF1F5; color:#6b7891}
   .num{text-align:center; font-weight:600}
   .bringing{font-size:14.5px; color:#3C4E66; max-width:230px; line-height:1.45}
   .note{font-size:14.5px; font-style:italic; color:#3C4E66; max-width:290px; line-height:1.45}
@@ -237,6 +238,7 @@
       <button class="on" data-f="all"  onclick="setFilter('all',this)">All</button>
       <button          data-f="yes"  onclick="setFilter('yes',this)">Coming</button>
       <button          data-f="no"   onclick="setFilter('no',this)">Can&rsquo;t come</button>
+      <button          data-f="noreply" onclick="setFilter('noreply',this)">No reply</button>
     </div>
     <input type="search" id="q" placeholder="Search by name&hellip;" oninput="render()">
   </div>
@@ -468,11 +470,27 @@ function guestList(){
   return out;
 }
 
+/* Everyone on the guest list, in one shape: the people who have answered (with
+   their reply) plus the people on an invitation who have NOT answered yet, so
+   the "No reply" filter has something to show. */
+function everyone(){
+  var out = guestList().map(function(g){
+    return { name: g.name, state: g.coming ? 'yes' : 'no', coming: g.coming, reply: g.reply };
+  });
+  INVITES.forEach(function(i){
+    inviteStatus(i).awaiting.forEach(function(nm){
+      out.push({ name: nm, state: 'noreply', coming: null, reply: null, token: i.token });
+    });
+  });
+  return out;
+}
+
 function visible(){
   var q = (document.getElementById('q').value || '').toLowerCase().trim();
-  return guestList().filter(function(g){
-    if(FILTER === 'yes' && !g.coming) return false;
-    if(FILTER === 'no'  &&  g.coming) return false;
+  return everyone().filter(function(g){
+    if(FILTER === 'yes'     && g.state !== 'yes')     return false;
+    if(FILTER === 'no'      && g.state !== 'no')      return false;
+    if(FILTER === 'noreply' && g.state !== 'noreply') return false;
     if(q && g.name.toLowerCase().indexOf(q) < 0) return false;
     return true;
   });
@@ -482,7 +500,9 @@ function render(){
   var people = visible(), el = document.getElementById('list');
   if(!people.length){
     el.innerHTML = '<div class="empty">' +
-      (ROWS.length ? 'Nobody matches that filter.' : 'No replies yet. They will appear here as guests respond.') +
+      (FILTER === 'noreply' ? 'Everyone invited has replied.'
+       : ROWS.length ? 'Nobody matches that filter.'
+       : 'No replies yet. They will appear here as guests respond.') +
       '</div>';
     return;
   }
@@ -496,6 +516,15 @@ function render(){
       '<th class="note-h">Notes</th><th class="when-h">Received</th><th></th>' +
     '</tr></thead><tbody>' +
     people.map(function(g){
+      if(g.state === 'noreply'){
+        return '<tr>' +
+          '<td><div class="nm">' + esc(g.name) + '</div></td>' +
+          '<td><span class="pill none">No reply</span></td>' +
+          '<td class="num">' + dash + '</td>' +
+          '<td class="note">' + dash + '</td>' +
+          '<td class="when-col"></td>' +
+          '<td class="acts"></td></tr>';
+      }
       var r = g.reply, key = encodeURIComponent(r.name);
       var lead = !seen[r.name]; seen[r.name] = true;
       var n = parseInt(r.photos, 10) || 0;
