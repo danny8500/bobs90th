@@ -401,9 +401,10 @@ function stats(){
     stated > heads ? heads + ' of ' + stated : heads;
   document.getElementById('sNo').textContent = cant;
   document.getElementById('sYes').textContent = ROWS.length;
-  /* invitations that have not come back at all - the chase list's size */
+  /* People on the guest list who have not answered yet - partial replies
+     included, so a couple with one reply still shows the other as outstanding. */
   var aw = document.getElementById('sAwaiting');
-  if(aw) aw.textContent = INVITES.filter(function(i){ return !i.replied; }).length;
+  if(aw) aw.textContent = awaitingPeople();
   document.getElementById('sPhotos').textContent = pics;
   var gap = document.getElementById('headGap');
   if(gap){
@@ -704,7 +705,7 @@ function showTab(t){
 
 function tabCounts(){
   document.getElementById('btRN').textContent = ROWS.length || '';
-  var waiting = INVITES.filter(function(i){ return !i.replied; }).length;
+  var waiting = INVITES.filter(function(i){ return inviteStatus(i).awaiting.length > 0; }).length;
   document.getElementById('btIN').textContent = waiting || '';
 }
 
@@ -716,13 +717,45 @@ function setInvFilter(f, btn){
 
 /* "No response" is the list that actually gets used — it is who still needs
    chasing, so it counts anyone without a reply whether or not they opened. */
+/* The backend stamps an invitation "replied" the moment ONE person on it
+   answers, so a couple where only one has replied looked fully done to both the
+   sheet and this panel (operator, 2026-09-03). Here we join the invitation's
+   own name list against the reply rows filed under its token and work out who
+   is actually still outstanding. */
+function inviteStatus(i){
+  var invited = splitNames(i.name);
+  var answered = {};
+  ROWS.forEach(function(r){
+    if(norm(r.invite) !== norm(i.token)) return;
+    var named = splitNames(r.guestNames).concat(splitNames(r.notComing));
+    if(!named.length && r.name) named = [r.name];   // a lone reply names itself in col B
+    named.forEach(function(n){ answered[norm(n)] = true; });
+  });
+  var awaiting = invited.filter(function(n){ return n && !answered[norm(n)]; });
+  var answeredCount = Math.max(0, invited.length - awaiting.length);
+  return {
+    invited: invited,
+    awaiting: awaiting,                       // names on the invite with no answer yet
+    answeredCount: answeredCount,
+    partial: answeredCount > 0 && awaiting.length > 0,
+    fullyReplied: invited.length > 0 && awaiting.length === 0 && answeredCount > 0,
+    none: answeredCount === 0
+  };
+}
+/* Total invited PEOPLE still to answer - the number the "No reply yet" card and
+   the sheet both want. Counts heads, not invitations, so a couple where one has
+   replied contributes 1, not 0 and not 2. */
+function awaitingPeople(){
+  return INVITES.reduce(function(n, i){ return n + inviteStatus(i).awaiting.length; }, 0);
+}
+
 function invVisible(){
   return INVITES.filter(function(i){
     if(NEW_TOKENS.indexOf(i.token) >= 0) return true;
-    if(INV_FILTER === 'noreply') return !i.replied;
-    if(INV_FILTER === 'opened')  return i.opened && !i.replied;
+    if(INV_FILTER === 'noreply') return inviteStatus(i).awaiting.length > 0;
+    if(INV_FILTER === 'opened')  return i.opened && !inviteStatus(i).fullyReplied;
     if(INV_FILTER === 'unsent')  return !i.sent;
-    if(INV_FILTER === 'replied') return !!i.replied;
+    if(INV_FILTER === 'replied') return inviteStatus(i).fullyReplied;
     return true;
   });
 }
@@ -838,7 +871,7 @@ async function addInvites(){
 
 async function sendInvites(only){
   var n = INVITES.filter(function(i){
-    return only === 'unsent' ? !i.sent : !i.replied;
+    return only === 'unsent' ? !i.sent : (inviteStatus(i).awaiting.length > 0);
   }).length;
   if(!n){ invMsg(only === 'unsent' ? 'Everyone has already been emailed.' : 'Everyone has replied.', 'ok'); return; }
   var what = only === 'unsent' ? 'Send the invitation to ' + n + ' person/people?'
@@ -874,11 +907,12 @@ function renderInvites(){
     return;
   }
   var sent = INVITES.filter(function(i){ return i.sent; }).length;
-  var opened = INVITES.filter(function(i){ return i.opened; }).length;
-  var replied = INVITES.filter(function(i){ return i.replied; }).length;
+  var fully = INVITES.filter(function(i){ return inviteStatus(i).fullyReplied; }).length;
+  var partial = INVITES.filter(function(i){ return inviteStatus(i).partial; }).length;
   st.innerHTML = '<b>' + INVITES.length + '</b> invited &middot; <b>' + sent + '</b> emailed &middot; ' +
-                 '<b>' + opened + '</b> opened &middot; <b>' + replied + '</b> replied &middot; ' +
-                 '<b>' + (INVITES.length - replied) + '</b> outstanding';
+                 '<b>' + fully + '</b> fully replied' +
+                 (partial ? ' &middot; <b>' + partial + '</b> partly replied' : '') +
+                 ' &middot; <b>' + awaitingPeople() + '</b> people still to reply';
 
   var list = invVisible();
   if(!list.length){
@@ -889,8 +923,11 @@ function renderInvites(){
       '<th>Invited</th><th style="text-align:center">Seats</th><th>Email</th><th>Status</th><th class="when-h">Emailed</th><th></th>' +
     '</tr></thead><tbody>' +
     list.map(function(i){
-      var stage = i.replied ? ['done','Replied'] : i.opened ? ['open','Opened, no reply'] :
-                  i.sent ? ['sent','Emailed'] : ['none','Not emailed'];
+      var stt = inviteStatus(i);
+      var stage = stt.fullyReplied ? ['done','Replied']
+                : stt.partial ? ['open', 'Partial — ' + stt.awaiting.join(', ') + ' still to reply']
+                : i.opened ? ['open','Opened, no reply']
+                : i.sent ? ['sent','Emailed'] : ['none','Not emailed'];
       return '<tr' + (NEW_TOKENS.indexOf(i.token) >= 0 ? ' class="justadded"' : '') + '>' +
         '<td><div class="nm">' + esc(i.name) + '</div><div class="lnk">' + esc(SITE + '?i=' + i.token) + '</div></td>' +
         '<td class="num">' + esc(i.seats || 1) + '</td>' +
