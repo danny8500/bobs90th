@@ -1011,17 +1011,32 @@ function applyInvitation(d){
     });
   }
 
-  /* Already answered, here or on another device? Show the reply rather than an
-     empty form, and remember it in this browser too. The form we just filled in
-     waits behind it for "Change my reply". */
+  /* Already answered, here or on another device? Two cases.
+
+     If EVERYONE on the invitation has answered, show the reply summary rather
+     than an empty form - there is nothing left to do but change it.
+
+     But if someone on the invitation still has NOT answered (Andrew replied for
+     himself; Danny has not), the useful screen is the FORM, not a summary:
+     Danny's own Coming/Can't must be right there to tap. buildWho() has already
+     locked Andrew's answer and left Danny's row live, so we simply fall through
+     to the form instead of intercepting with the summary panel (operator,
+     2026-09-03 - the summary-with-"Reply for someone else" was the bug). */
   if(d.reply && d.reply.name){
     saveReply({ name: d.reply.name, attending: d.reply.attending,
                 guests: d.reply.guests, photoCount: parseInt(d.reply.photos, 10) || 0,
                 guestNames: d.reply.guestNames || '', notComing: d.reply.notComing || '' });
-    if(renderReturning(d.reply, true)){
+    var answered = {};
+    splitNames(d.reply.guestNames).concat(splitNames(d.reply.notComing))
+      .forEach(function(n){ answered[norm(n)] = true; });
+    var everyoneAnswered = (inv.names && inv.names.length > 1)
+      ? inv.names.every(function(n){ return answered[norm(n)]; })
+      : true;
+    if(everyoneAnswered && renderReturning(d.reply, true)){
       var b = document.getElementById('invited'); if(b) b.hidden = true;
       return true;
     }
+    /* someone outstanding -> fall through to the form (locks already applied) */
   } else {
     /* The Sheet has no reply for this invitation, so anything this browser
        remembers is out of date - forget it and show a clean form. */
