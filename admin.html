@@ -681,6 +681,7 @@ async function saveEdit(){
     await adminPost({
       type: 'admin-update',
       original: EDITING.name,          // match on the OLD name so renames work
+      token: (EDITING && EDITING.invite) || '',   // identity: two guests can share a first name
       name: name,
       attending: attending,
       guests: attending === 'yes' ? document.getElementById('eGuests').value : '0',
@@ -706,7 +707,7 @@ async function doDelete(encName){
   if(!confirm('Delete ' + name + ' from the guest list?' + extra +
      '\n\nThis cannot be undone from here.')) return;
   try{
-    var d = await adminPost({ type: 'admin-delete', name: name });
+    var d = await adminPost({ type: 'admin-delete', name: name, token: (r && r.invite) || '' });
     await load();
     if(d && d.trashedPhotos) console.log('trashed ' + d.trashedPhotos + ' photo(s)');
   }catch(e){
@@ -768,12 +769,30 @@ function inviteStatus(i){
   var tokenRows = ROWS.filter(function(r){ return norm(r.invite) === norm(i.token); });
   var scope = tokenRows.length ? tokenRows : ROWS;
   var byName = tokenRows.length === 0;
+  /* In NAME-fallback mode two more things have to be true before a reply counts as
+     this invitation's, or one guest's answer is credited to another person with the
+     same first name (a solo "Dave" was shown as replied off a different Dave's
+     answer, 2026-09-06):
+       - the reply must not already be stamped with another invitation's token, and
+       - the name must appear on exactly ONE invitation in the list.
+     Where it is not certain the person stays in "no reply yet", which is the
+     recoverable error. */
+  var claimed = {};
+  INVITES.forEach(function(x){ if(x.token) claimed[norm(x.token)] = true; });
+  var uniqueOnList = function(n){
+    var c = 0;
+    INVITES.forEach(function(x){
+      if(splitNames(x.name).some(function(y){ return norm(y) === norm(n); })) c++;
+    });
+    return c === 1;
+  };
   var onInvite = function(n){ return invited.some(function(x){ return norm(x) === norm(n); }); };
   var answered = {};
   scope.forEach(function(r){
+    if(byName && r.invite && claimed[norm(r.invite)]) return;   // already another invitation's reply
     var named = splitNames(r.guestNames).concat(splitNames(r.notComing));
     if(!named.length && r.name) named = [r.name];   // a lone reply names itself in col B
-    named.forEach(function(n){ if(!byName || onInvite(n)) answered[norm(n)] = true; });
+    named.forEach(function(n){ if(!byName || (onInvite(n) && uniqueOnList(n))) answered[norm(n)] = true; });
   });
   var awaiting = invited.filter(function(n){ return n && !answered[norm(n)]; });
   var answeredCount = Math.max(0, invited.length - awaiting.length);
