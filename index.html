@@ -176,6 +176,12 @@
   .dress-v{display:block; font-family:var(--display); font-weight:400;
            font-size:clamp(27px,3.3vw,36px); color:var(--cream); line-height:1.15}
   .dress-note{display:block; font-size:15.5px; font-style:italic; color:#A8B4C8; margin-top:9px}
+  /* Set apart from the dress lines by its own rule: it is a request, not part of
+     the dress code, and sitting as a third line under "Cocktail attire" read as
+     one. Cream rather than the muted blue so it is not mistaken for a footnote. */
+  .gifts{display:block; width:270px; max-width:72%; margin:30px auto 0; padding-top:24px;
+         border-top:1px solid var(--gold-dim);
+         font-size:17.5px; font-style:italic; color:var(--cream); line-height:1.5}
 
   .col .vsep{width:34px; height:1px; background:var(--gold-dim); margin:16px auto 14px}
 
@@ -485,6 +491,7 @@
       <span class="dress-lab">Dress</span>
       <span class="dress-v">Cocktail attire</span>
       <span class="dress-note">Jacket optional</span>
+      <span class="gifts">No gifts, please</span>
     </div>
   </div>
 </section>
@@ -508,7 +515,8 @@
     <span>Cocktails 6:00 PM</span><span class="rsep">&middot;</span>
     <span>Dinner 7:00 PM</span><span class="rsep">&middot;</span>
     <span><a href="https://maps.google.com/?q=4602+N.+Virginia+Road,+Long+Beach,+CA+90807" target="_blank" rel="noopener">Virginia Country Club, Long Beach</a></span><span class="rsep">&middot;</span>
-    <span>Cocktail attire</span>
+    <span>Cocktail attire</span><span class="rsep">&middot;</span>
+    <span>No gifts, please</span>
   </div>
 
   <!-- Shown INSTEAD of the form when this browser remembers a reply. -->
